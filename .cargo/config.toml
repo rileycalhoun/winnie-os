@@ -1,0 +1,9 @@
+[unstable]
+build-std = ["core"]
+json-target-spec = true
+
+[build]
+target = "targets/x86_64-kernel.json"
+
+[target.x86_64-kernel]
+runner = ["./build.sh"]
