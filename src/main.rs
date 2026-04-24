@@ -22,8 +22,7 @@ extern "C" fn kernel_main() -> ! {
     arch::x86_64::idt::init();
     println!("Hello from WinnieOS!");
 
-    let x = 1 / 0;
-    println!("{}", x);
+    unsafe { core::arch::asm!("ud2") };
     loop {}
 }
 

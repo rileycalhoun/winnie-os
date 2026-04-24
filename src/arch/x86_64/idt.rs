@@ -77,12 +77,45 @@ pub extern "x86-interrupt" fn double_fault_handler(frame: &InterruptFrame, _erro
     panic!("DOUBLE FAULT at {:#x}", frame.rip)
 }
 
+pub extern "x86-interrupt" fn divide_error_handler(frame: &InterruptFrame, _error_code: u64) -> ! {
+    panic!("DIVIDE ERROR at {:#x}", frame.rip)
+}
+
+pub extern "x86-interrupt" fn invalid_opcode_handler(
+    frame: &InterruptFrame,
+    _error_code: u64,
+) -> ! {
+    panic!("INVALID OPCODE at {:#x}", frame.rip)
+}
+
+/**
+ * With Error Codes
+ */
+
+pub extern "x86-interrupt" fn general_protection_handler(
+    frame: &InterruptFrame,
+    error_code: u64,
+) -> ! {
+    panic!(
+        "GENERAL PROTECTION FAULT (code={:#x}) at {:#x}",
+        error_code, frame.rip
+    )
+}
+
+pub extern "x86-interrupt" fn page_fault_handler(frame: &InterruptFrame, error_code: u64) -> ! {
+    panic!("PAGE FAULT (code={:#x}) at {:#x}", error_code, frame.rip)
+}
+
 static mut IDT: Idt = Idt::new();
 
 pub fn init() {
     unsafe {
         let idt = &raw mut IDT;
+        (*idt).set(0, divide_error_handler as *const () as u64);
+        (*idt).set(6, invalid_opcode_handler as *const () as u64);
         (*idt).set(8, double_fault_handler as *const () as u64);
+        (*idt).set(13, general_protection_handler as *const () as u64);
+        (*idt).set(14, page_fault_handler as *const () as u64);
         (*idt).load();
     }
 }
