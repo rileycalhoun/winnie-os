@@ -23,11 +23,11 @@ impl IdtEntry {
         _reserved: 0,
     };
 
-    pub fn new(handler: u64) -> Self {
+    pub fn new(handler: u64, ist: u8) -> Self {
         Self {
             offset_low: (handler & 0xFFFF) as u16,
             selector: 0x8,
-            ist: 0,
+            ist,
             attributes: 0x8E,
             offset_mid: ((handler >> 16) & 0xFFFF) as u16,
             offset_high: (handler >> 32) as u32,
@@ -45,7 +45,11 @@ impl Idt {
     }
 
     pub fn set(&mut self, vector: usize, handler: u64) {
-        self.0[vector] = IdtEntry::new(handler)
+        self.0[vector] = IdtEntry::new(handler, 0)
+    }
+
+    pub fn set_with_ist(&mut self, vector: usize, handler: u64, ist: u8) {
+        self.0[vector] = IdtEntry::new(handler, ist)
     }
 
     pub fn load(&self) {
@@ -114,7 +118,7 @@ pub fn init() {
         let idt = &raw mut IDT;
         (*idt).set(0, divide_error_handler as *const () as u64);
         (*idt).set(6, invalid_opcode_handler as *const () as u64);
-        (*idt).set(8, double_fault_handler as *const () as u64);
+        (*idt).set_with_ist(8, double_fault_handler as *const () as u64, 1);
         (*idt).set(13, general_protection_handler as *const () as u64);
         (*idt).set(14, page_fault_handler as *const () as u64);
         (*idt).load();
