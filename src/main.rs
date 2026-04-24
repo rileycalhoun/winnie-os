@@ -1,5 +1,7 @@
 #![no_std]
 #![no_main]
+#![feature(abi_x86_interrupt)]
+#![allow(unconditional_panic)]
 
 mod arch;
 mod drivers;
@@ -17,7 +19,11 @@ macro_rules! println {
 
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main() -> ! {
+    arch::x86_64::idt::init();
     println!("Hello from WinnieOS!");
+
+    let x = 1 / 0;
+    println!("{}", x);
     loop {}
 }
 
