@@ -21,13 +21,26 @@ macro_rules! println {
 extern "C" fn kernel_main() -> ! {
     arch::x86_64::idt::init();
     println!("Hello from WinnieOS!");
+    initiate_divide_error();
 
-    unsafe { core::arch::asm!("ud2") };
     loop {}
 }
 
+/* A basic divide-by-zero error used for testing. */
+fn initiate_divide_error() {
+    unsafe {
+        core::arch::asm!(
+            "xor rdx, rdx",
+            "mov rax, 1",
+            "xor rcx, rcx",
+            "div rcx",
+            options(nostack)
+        );
+    };
+}
+
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo) -> ! {
-    println!("PANIC");
+fn panic(info: &core::panic::PanicInfo) -> ! {
+    println!("PANIC: {}", info.message());
     loop {}
 }

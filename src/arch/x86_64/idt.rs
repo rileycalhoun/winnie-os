@@ -73,24 +73,25 @@ pub struct InterruptFrame {
     pub ss: u64,
 }
 
-pub extern "x86-interrupt" fn double_fault_handler(frame: &InterruptFrame, _error_code: u64) -> ! {
-    panic!("DOUBLE FAULT at {:#x}", frame.rip)
-}
+/**
+ * No Error Codes
+ */
 
-pub extern "x86-interrupt" fn divide_error_handler(frame: &InterruptFrame, _error_code: u64) -> ! {
+pub extern "x86-interrupt" fn divide_error_handler(frame: &InterruptFrame) -> ! {
     panic!("DIVIDE ERROR at {:#x}", frame.rip)
 }
 
-pub extern "x86-interrupt" fn invalid_opcode_handler(
-    frame: &InterruptFrame,
-    _error_code: u64,
-) -> ! {
+pub extern "x86-interrupt" fn invalid_opcode_handler(frame: &InterruptFrame) -> ! {
     panic!("INVALID OPCODE at {:#x}", frame.rip)
 }
 
 /**
  * With Error Codes
  */
+
+pub extern "x86-interrupt" fn double_fault_handler(frame: &InterruptFrame, error_code: u64) -> ! {
+    panic!("DOUBLE FAULT (code={:#x}) at {:#x}", error_code, frame.rip)
+}
 
 pub extern "x86-interrupt" fn general_protection_handler(
     frame: &InterruptFrame,

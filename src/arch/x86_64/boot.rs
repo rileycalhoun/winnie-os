@@ -15,7 +15,7 @@ global_asm!(
         .section .bss
         .align 16
         stack_bottom:
-            .skip 16384
+            .skip 524288
         stack_top:
         .align 4096
         p4_table:
@@ -41,13 +41,23 @@ global_asm!(
             mov [p3_table], eax
 
             mov dword ptr [p2_table], 0x83
+            mov dword ptr [p2_table + 8], 0x200083
 
             mov eax, OFFSET p4_table
             mov cr3, eax
 
+            mov eax, cr0
+            and eax, ~(1 << 2)
+            or eax, (1 << 1)
+            mov cr0, eax
+
             mov eax, cr4
-            or eax, 0x20
+            or eax, (1 << 5)
+            or eax, (1 << 9)
+            or eax, (1 << 10)
             mov cr4, eax
+
+            fninit
 
             mov ecx, 0xC0000080
             rdmsr
