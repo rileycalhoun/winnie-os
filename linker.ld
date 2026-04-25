@@ -5,23 +5,23 @@ KERNEL_VIRT_BASE = 0xffffffff80000000;
 SECTIONS {
     . = 0x00100000;
 
-    .multiboot : ALIGN(8) {
+    .multiboot ALIGN(8) : {
         KEEP(*(.multiboot))
     }
 
-    .boot.text : ALIGN(4096) {
+    .boot.text ALIGN(4096) : {
         *(.boot.text .boot.text.*)
     }
 
-    .boot.rodata : ALIGN(4096) {
+    .boot.rodata ALIGN(4096) : {
         *(.boot.rodata .boot.rodata.*)
     }
 
-    .boot.data : ALIGN(4096) {
+    .boot.data ALIGN(4096) : {
         *(.boot.data .boot.data.*)
     }
 
-    .boot.bss : ALIGN(4096) {
+    .boot.bss ALIGN(4096) : {
         *(COMMON)
         *(.boot.bss .boot.bss.*)
     }

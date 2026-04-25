@@ -2,6 +2,15 @@ use core::arch::global_asm;
 
 global_asm!(
     r#"
+        .equ KERNEL_STACK_TOP, 0xffffffff80203000
+        .equ PF_IST_STACK_TOP,  0xffffffff80206000
+        .equ DF_IST_STACK_TOP,  0xffffffff80208000
+
+        .extern __kernel_phys_start
+        .extern __kernel_phys_end
+        .extern __kernel_virt_start
+        .extern __kernel_virt_end
+
         .section .multiboot, "a"
         .align 8
         .long 0xe85250d6
@@ -12,7 +21,7 @@ global_asm!(
         .short 0
         .long 8
 
-        .section .boot.bss
+        .section .boot.bss, "aw", @nobits
         .align 16
         stack_bottom:
             .skip 524288
@@ -29,30 +38,125 @@ global_asm!(
         tss64_end:
 
         .align 4096
-        p4_table:
+        kernel_stack_page0:
             .skip 4096
-        p3_table:
+        kernel_stack_page1:
             .skip 4096
-        p2_table:
+        pf_ist_stack_page:
+            .skip 4096
+        df_ist_stack_page:
             .skip 4096
 
-        .section .boot.text
+        .align 4096
+        p4_table:
+            .skip 4096
+
+        .align 4096
+        p3_low:
+            .skip 4096
+        p2_low:
+            .skip 4096
+        p1_low:
+            .skip 4096
+
+        .align 4096
+        p3_high:
+            .skip 4096
+        p2_high:
+            .skip 4096
+        p1_high_kernel:
+            .skip 4096
+
+        .align 4096
+        p1_high_stack:
+            .skip 4096
+
+
+        .section .boot.text, "ax"
         .code32
         .global _start
         _start:
             mov esp, OFFSET stack_top
             lgdt [gdt64_descriptor32]
 
-            mov eax, OFFSET p3_table
+            mov eax, OFFSET p3_low
             or eax, 0x3
             mov [p4_table], eax
 
-            mov eax, OFFSET p2_table
+            mov eax, OFFSET p2_low
             or eax, 0x3
-            mov [p3_table], eax
+            mov [p3_low], eax
 
-            mov dword ptr [p2_table], 0x83
-            mov dword ptr [p2_table + 8], 0x200083
+            mov eax, OFFSET p1_low
+            or eax, 0x3
+            mov [p2_low], eax
+
+            xor ecx, ecx
+        1:
+            mov eax, ecx
+            shl eax, 12
+            or eax, 0x3
+            mov [p1_low + ecx * 8], eax
+            inc ecx
+            cmp ecx, 512
+            jne 1b
+
+            mov eax, OFFSET p3_high
+            or eax, 0x3
+            mov [p4_table + 8 * 511], eax
+
+            mov eax, OFFSET p2_high
+            or eax, 0x3
+            mov [p3_high + 8 * 510], eax
+
+            mov eax, OFFSET p1_high_kernel
+            or eax, 0x3
+            mov [p2_high + 8 * 0], eax
+
+            mov eax, OFFSET p1_high_stack
+            or eax, 0x3
+            mov [p2_high + 8 * 1], eax
+
+            mov esi, OFFSET __kernel_phys_start
+            mov edi, OFFSET __kernel_phys_end
+
+            mov ecx, OFFSET __kernel_phys_start
+            and ecx, 0x1ff000
+            shr ecx, 12
+
+            sub edi, esi
+            add edi, 0x0fff
+            shr edi, 12
+
+        2:
+            cmp edi, 0
+            je 3f
+
+            mov eax, esi
+            or eax, 0x3
+            mov [p1_high_kernel + ecx * 8], eax
+
+            add esi, 0x1000
+            inc ecx
+            dec edi
+            jmp 2b
+
+        3:
+            mov eax, OFFSET kernel_stack_page0
+            or eax, 0x3
+            mov [p1_high_stack + 8 * 1], eax
+
+            mov eax, OFFSET kernel_stack_page1
+            or eax, 0x3
+            mov [p1_high_stack + 8 * 2], eax
+
+            mov eax, OFFSET pf_ist_stack_page
+            or eax, 0x3
+            mov [p1_high_stack + 8 * 5], eax
+
+            mov eax, OFFSET df_ist_stack_page
+            or eax, 0x3
+            mov [p1_high_stack + 8 * 7], eax
 
             mov eax, OFFSET p4_table
             mov cr3, eax
@@ -93,8 +197,12 @@ global_asm!(
             mov gs, ax
             mov ss, ax
 
-            mov rax, OFFSET double_fault_stack_top
+            mov rax, DF_IST_STACK_TOP
             mov [tss64 + 0x24], rax
+
+            mov rax, PF_IST_STACK_TOP
+            mov [tss64 + 0x2c], rax
+
             mov ax, 104
             mov word ptr [tss64 + 0x66], ax
 
@@ -112,13 +220,16 @@ global_asm!(
 
             mov ax, 0x18
             ltr ax
+
+            mov rsp, KERNEL_STACK_TOP
+
             mov rax, OFFSET kernel_main_high
-            jmp .halt
+            jmp rax
         .halt:
             hlt
             jmp .halt
 
-        .section .boot.rodata
+        .section .boot.rodata, "a"
         .align 8
         gdt64:
             .quad 0

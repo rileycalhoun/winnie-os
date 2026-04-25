@@ -1,5 +1,7 @@
 use core::mem::size_of;
 
+use crate::println;
+
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct IdtEntry {
@@ -27,7 +29,7 @@ impl IdtEntry {
         Self {
             offset_low: (handler & 0xFFFF) as u16,
             selector: 0x8,
-            ist,
+            ist: ist & 0x7,
             attributes: 0x8E,
             offset_mid: ((handler >> 16) & 0xFFFF) as u16,
             offset_high: (handler >> 32) as u32,
@@ -94,7 +96,10 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(frame: &InterruptFrame) -> 
  */
 
 pub extern "x86-interrupt" fn double_fault_handler(frame: &InterruptFrame, error_code: u64) -> ! {
-    panic!("DOUBLE FAULT (code={:#x}) at {:#x}", error_code, frame.rip)
+    println!("DOUBLE FAULT (code={:#x}) at {:#x}", error_code, frame.rip);
+    loop {
+        unsafe { core::arch::asm!("hlt") }
+    }
 }
 
 pub extern "x86-interrupt" fn general_protection_handler(
@@ -108,7 +113,11 @@ pub extern "x86-interrupt" fn general_protection_handler(
 }
 
 pub extern "x86-interrupt" fn page_fault_handler(frame: &InterruptFrame, error_code: u64) -> ! {
-    panic!("PAGE FAULT (code={:#x}) at {:#x}", error_code, frame.rip)
+    println!("PAGE FAULT (code={:#x}) at {:#x}", error_code, frame.rip);
+
+    loop {
+        unsafe { core::arch::asm!("hlt") }
+    }
 }
 
 static mut IDT: Idt = Idt::new();
@@ -120,7 +129,7 @@ pub fn init() {
         (*idt).set(6, invalid_opcode_handler as *const () as u64);
         (*idt).set_with_ist(8, double_fault_handler as *const () as u64, 1);
         (*idt).set(13, general_protection_handler as *const () as u64);
-        (*idt).set(14, page_fault_handler as *const () as u64);
+        (*idt).set_with_ist(14, page_fault_handler as *const () as u64, 2);
         (*idt).load();
     }
 }
