@@ -2,3 +2,4 @@
 *.iso
 iso/boot/*.elf
 qemu.log
+qemu-test.log
