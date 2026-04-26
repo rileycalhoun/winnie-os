@@ -2,6 +2,12 @@ use core::mem::size_of;
 
 use crate::println;
 
+/// One 16-byte x86_64 interrupt descriptor table entry.
+///
+/// Winnie OS uses these entries during early higher-half kernel bring-up to map
+/// selected exception vectors to fixed handler entrypoints. The current entries
+/// all target the kernel code segment and either use no IST override or one of
+/// the dedicated fault stacks established by bootstrap code.
 #[derive(Clone, Copy)]
 #[repr(C)]
 pub struct IdtEntry {
@@ -25,6 +31,17 @@ impl IdtEntry {
         _reserved: 0,
     };
 
+    /// Builds a present interrupt gate for a 64-bit handler address.
+    ///
+    /// The current implementation always installs the handler into selector
+    /// `0x8`, which is the kernel 64-bit code segment loaded by the bootstrap
+    /// path before Rust runs in the higher half. It sets attributes to `0x8E`,
+    /// meaning a present interrupt gate at privilege level 0.
+    ///
+    /// The `ist` argument is masked to the low three bits because x86_64 IDT
+    /// entries only encode IST slots 0 through 7. Winnie OS currently relies on
+    /// that field to preserve the architectural invariant that `#DF` uses IST1
+    /// and `#PF` uses IST2.
     pub fn new(handler: u64, ist: u8) -> Self {
         Self {
             offset_low: (handler & 0xFFFF) as u16,
@@ -38,28 +55,56 @@ impl IdtEntry {
     }
 }
 
+/// The single 256-entry interrupt descriptor table used by the early kernel.
+///
+/// This table is populated during single-threaded higher-half bring-up before
+/// interrupts are enabled. The current system installs only the exception
+/// vectors needed for early fault visibility and keeps all fault paths minimal
+/// and terminal through [`crate::hlt_loop`].
 #[repr(C, align(16))]
 pub struct Idt([IdtEntry; 256]);
 
 impl Idt {
+    /// Creates an IDT with every vector marked missing.
+    ///
+    /// This is used to initialize the single global IDT before selected
+    /// exception vectors are populated during early kernel startup.
     pub const fn new() -> Self {
         Self([IdtEntry::MISSING; 256])
     }
 
+    /// Installs a handler for `vector` without selecting an IST override.
+    ///
+    /// This is used for exceptions that currently run on the active kernel stack
+    /// rather than a dedicated IST stack.
     pub fn set(&mut self, vector: usize, handler: u64) {
         self.0[vector] = IdtEntry::new(handler, 0)
     }
 
+    /// Installs a handler for `vector` with a specific IST slot.
+    ///
+    /// The current initialization uses this to preserve two architectural
+    /// invariants established by bootstrap code: `#DF` is routed through IST1
+    /// and `#PF` is routed through IST2 so those destructive fault paths do not
+    /// depend on the current kernel stack remaining usable.
     pub fn set_with_ist(&mut self, vector: usize, handler: u64, ist: u8) {
         self.0[vector] = IdtEntry::new(handler, ist)
     }
 
+    /// Loads this table into the processor with `lidt`.
+    ///
+    /// This builds the packed 10-byte IDT descriptor expected by x86_64: a
+    /// 16-bit limit covering the table size minus one and a 64-bit base address
+    /// pointing at this `Idt`. Loading is safe once the kernel is executing in
+    /// the higher half with the IDT memory mapped and stable, and after any
+    /// vectors the kernel depends on have been installed.
     pub fn load(&self) {
         let descriptor = IdtDescriptor {
             limit: (size_of::<Idt>() - 1) as u16,
             base: self as *const _ as u64,
         };
 
+        // Sound because `descriptor` points to a valid in-scope IDT descriptor for this call.
         unsafe { core::arch::asm!("lidt [{}]", in(reg) &descriptor) }
     }
 }
@@ -70,6 +115,10 @@ struct IdtDescriptor {
     base: u64,
 }
 
+/// The stack frame pushed by the CPU for x86_64 interrupt and exception entry.
+///
+/// Handler signatures in this file match the architecture's exception calling
+/// convention exactly so the CPU-supplied frame layout remains correct.
 #[repr(C)]
 pub struct InterruptFrame {
     pub rip: u64,
@@ -79,57 +128,109 @@ pub struct InterruptFrame {
     pub ss: u64,
 }
 
-/**
+/*
  * No Error Codes
  */
 
-pub extern "x86-interrupt" fn divide_error_handler(frame: &InterruptFrame) -> ! {
-    panic!("DIVIDE ERROR at {:#x}", frame.rip)
+/// Handles vector 0, the divide-error exception.
+///
+/// The CPU does not supply an error code for this exception, so the handler
+/// takes only an [`InterruptFrame`]. The implementation is intentionally
+/// minimal: it prints a fixed message and terminates in [`crate::hlt_loop`],
+/// which keeps early destructive fault handling simple and auditable in the
+/// higher-half kernel.
+pub extern "x86-interrupt" fn divide_error_handler(_frame: &InterruptFrame) -> ! {
+    println!("DIVIDE ERROR");
+    crate::hlt_loop()
 }
 
-pub extern "x86-interrupt" fn invalid_opcode_handler(frame: &InterruptFrame) -> ! {
-    panic!("INVALID OPCODE at {:#x}", frame.rip)
+/// Handles vector 6, the invalid-opcode exception.
+///
+/// The CPU does not supply an error code for this exception. The current path
+/// avoids complex recovery and instead emits a fixed message before terminating
+/// in [`crate::hlt_loop`].
+pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) -> ! {
+    println!("INVALID OPCODE");
+    crate::hlt_loop()
 }
 
-/**
+/*
  * With Error Codes
  */
 
-pub extern "x86-interrupt" fn double_fault_handler(frame: &InterruptFrame, error_code: u64) -> ! {
-    println!("DOUBLE FAULT (code={:#x}) at {:#x}", error_code, frame.rip);
-    loop {
-        unsafe { core::arch::asm!("hlt") }
-    }
-}
-
-pub extern "x86-interrupt" fn general_protection_handler(
-    frame: &InterruptFrame,
-    error_code: u64,
+/// Handles vector 8, the double-fault exception.
+///
+/// The CPU architecturally supplies an error code for `#DF`, and this handler's
+/// signature reflects that requirement exactly. Winnie OS installs `#DF` with
+/// IST1 so the handler runs on the dedicated double-fault stack established by
+/// bootstrap code, which avoids relying on a possibly corrupted current stack.
+/// The implementation stays intentionally minimal and terminal by printing a
+/// fixed message and then entering [`crate::hlt_loop`].
+pub extern "x86-interrupt" fn double_fault_handler(
+    _frame: &InterruptFrame,
+    _error_code: u64,
 ) -> ! {
-    panic!(
-        "GENERAL PROTECTION FAULT (code={:#x}) at {:#x}",
-        error_code, frame.rip
-    )
+    println!("DOUBLE FAULT");
+    crate::hlt_loop()
 }
 
-pub extern "x86-interrupt" fn page_fault_handler(frame: &InterruptFrame, error_code: u64) -> ! {
-    println!("PAGE FAULT (code={:#x}) at {:#x}", error_code, frame.rip);
+/// Handles vector 13, the general-protection exception.
+///
+/// The CPU architecturally supplies an error code for `#GP`, so this handler
+/// accepts one even though the current implementation only reports a fixed
+/// message. The path remains minimal and terminates in [`crate::hlt_loop`]
+/// rather than attempting recovery from compromised kernel state.
+pub extern "x86-interrupt" fn general_protection_handler(
+    _frame: &InterruptFrame,
+    _error_code: u64,
+) -> ! {
+    println!("GENERAL PROTECTION FAULT");
+    crate::hlt_loop()
+}
 
-    loop {
-        unsafe { core::arch::asm!("hlt") }
-    }
+/// Handles vector 14, the page-fault exception.
+///
+/// The CPU architecturally supplies an error code for `#PF`, and Winnie OS
+/// installs this handler with IST2 so page faults do not depend on the current
+/// kernel stack remaining usable. This preserves the current fault-handling
+/// invariant that `#PF` runs on its dedicated IST stack. The implementation is
+/// intentionally minimal: it prints a fixed message and terminates in
+/// [`crate::hlt_loop`].
+pub extern "x86-interrupt" fn page_fault_handler(
+    _frame: &InterruptFrame,
+    _error_code: u64,
+) -> ! {
+    println!("PAGE FAULT");
+    crate::hlt_loop()
 }
 
 static mut IDT: Idt = Idt::new();
 
+/// Populates and loads the single global IDT used during early kernel startup.
+///
+/// This function runs after the architecture bootstrap code has transferred
+/// control into the higher-half kernel and before interrupts are enabled. It
+/// installs the currently supported exception vectors: divide error (`0`),
+/// invalid opcode (`6`), double fault (`8`) on IST1, general protection (`13`),
+/// and page fault (`14`) on IST2.
+///
+/// Initialization uses the one global IDT because the kernel is still in a
+/// single-threaded bring-up phase with exclusive access to that table. The
+/// configured handlers all keep fault paths minimal and terminal through
+/// [`crate::hlt_loop`], which matches the current early-kernel design.
 pub fn init() {
-    unsafe {
-        let idt = &raw mut IDT;
-        (*idt).set(0, divide_error_handler as *const () as u64);
-        (*idt).set(6, invalid_opcode_handler as *const () as u64);
-        (*idt).set_with_ist(8, double_fault_handler as *const () as u64, 1);
-        (*idt).set(13, general_protection_handler as *const () as u64);
-        (*idt).set_with_ist(14, page_fault_handler as *const () as u64, 2);
-        (*idt).load();
-    }
+    // Sound because early init has exclusive access to the single global IDT before interrupts are enabled.
+    let idt = &raw mut IDT;
+    // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
+    unsafe { (*idt).set(0, divide_error_handler as *const () as u64) };
+    // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
+    unsafe { (*idt).set(6, invalid_opcode_handler as *const () as u64) };
+    // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
+    unsafe { (*idt).set_with_ist(8, double_fault_handler as *const () as u64, 1) };
+    // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
+    unsafe { (*idt).set(13, general_protection_handler as *const () as u64) };
+    // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
+    unsafe { (*idt).set_with_ist(14, page_fault_handler as *const () as u64, 2) };
+    // Sound because `idt` still points to the initialized static IDT for the duration of this call.
+    unsafe { (*idt).load() };
 }
