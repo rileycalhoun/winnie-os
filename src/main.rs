@@ -11,7 +11,7 @@ mod drivers;
 ///
 /// This function is used once the kernel has no further work to do or has reached
 /// an unrecoverable terminal state, which is the current end of control flow both
-/// after normal startup in [`kernel_main_high`] and after a panic in [`panic`].
+/// after normal startup in [`kernel_main_high`] and after a panic in [`panic()`].
 ///
 /// It assumes the CPU is already in the higher-half kernel runtime established by
 /// earlier bootstrap code and that interrupts, if enabled, may wake the processor
