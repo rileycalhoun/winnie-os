@@ -52,6 +52,16 @@ The project is an early-stage `no_std` x86_64 kernel. Changes should prefer clar
 - Keep architecture docs in `~/Documents/winnie-os/` aligned with the code.
 - Favor concrete descriptions over aspirational language.
 - Document what the system does now, what assumptions it relies on, and what is still missing.
+- Keep the kernel thoroughly documented as it evolves.
+- New kernel subsystems, major control-flow changes, memory-layout changes, syscall changes, trap-handling changes, and build-pipeline changes must be reflected in documentation.
+- When a subsystem is added, document at least:
+  - its purpose
+  - its boundaries and responsibilities
+  - key invariants
+  - important control flow
+  - current limitations
+- Code comments should explain non-obvious machine-state assumptions and safety invariants, but they do not replace vault documentation.
+- Prefer updating existing architecture and reference notes over leaving behavior undocumented until later.
 
 ## Testing And Verification
 
