@@ -31,17 +31,24 @@ pub fn hlt_loop() -> ! {
 /// At this point the early boot path has already established the current machine
 /// state needed to execute Rust in the higher half, including the active kernel
 /// stack and the basic descriptor and paging setup performed before this handoff.
-/// This function first initializes the IDT so exception handling is in place
-/// before emitting the current startup message.
+/// This function first initializes the early serial debug path, then loads the
+/// IDT so exception handling is in place before emitting the current startup
+/// output. If serial initialization fails, the function reports that condition
+/// on VGA and continues with VGA-only console mirroring.
 ///
 /// After printing `Hello from WinnieOS!`, it hands control to [`hlt_loop`], which
 /// is the kernel's current terminal path. It never returns because there is no
 /// scheduler, idle task, or later boot stage to return to in the current system.
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main_high() -> ! {
+    let serial_ready = drivers::serial::init().is_ok();
     arch::x86_64::idt::init();
-    println!("Hello from WinnieOS!");
 
+    if !serial_ready {
+        crate::drivers::vga::write_bytes(b"[serial init failed]\n");
+    }
+
+    println!("Hello from WinnieOS!");
     hlt_loop()
 }
 
