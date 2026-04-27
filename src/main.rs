@@ -3,9 +3,26 @@
 #![feature(abi_x86_interrupt)]
 #![allow(unconditional_panic, unconditional_recursion)]
 
+use core::cell::UnsafeCell;
+
+use crate::boot_info::BootInfo;
+
 mod arch;
+mod boot_info;
 mod console;
 mod drivers;
+
+/// Wraps the single early-boot `BootInfo` instance in interior mutability.
+///
+/// Phase 0 parses boot metadata exactly once during single-threaded bring-up,
+/// but storing the owned structure off-stack avoids overflowing the small early
+/// kernel stack during parser calls.
+struct BootInfoStorage(UnsafeCell<BootInfo>);
+
+// Sound because early kernel bring-up is still single-threaded, so no concurrent
+// access exists while this storage is initialized and then read.
+unsafe impl Sync for BootInfoStorage {}
+static BOOT_INFO: BootInfoStorage = BootInfoStorage(UnsafeCell::new(BootInfo::new()));
 
 /// Enters the kernel's terminal halt path by repeatedly executing `hlt`.
 ///
@@ -25,6 +42,19 @@ pub fn hlt_loop() -> ! {
     }
 }
 
+/// Emits the currently parsed boot-time memory map in a stable debug format.
+fn log_boot_info(boot_info: &BootInfo) {
+    println!("BOOT INFO: {} regions", boot_info.region_count());
+    for region in boot_info.regions() {
+        println!(
+            "MMAP base={:#018x} len={:#018x} kind={}",
+            region.base,
+            region.length,
+            region.kind.as_str()
+        )
+    }
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -40,7 +70,7 @@ pub fn hlt_loop() -> ! {
 /// is the kernel's current terminal path. It never returns because there is no
 /// scheduler, idle task, or later boot stage to return to in the current system.
 #[unsafe(no_mangle)]
-extern "C" fn kernel_main_high() -> ! {
+extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     let serial_ready = drivers::serial::init().is_ok();
     arch::x86_64::idt::init();
 
@@ -48,6 +78,22 @@ extern "C" fn kernel_main_high() -> ! {
         crate::drivers::vga::write_bytes(b"[serial init failed]\n");
     }
 
+    // Sound because early kernel bring-up is single-threaded and this storage
+    // is initialized exactly once before any later shared access exists.
+    let boot_info = unsafe { &mut *BOOT_INFO.0.get() };
+    match arch::x86_64::boot_info::parse_multiboot2(
+        multiboot_magic,
+        multiboot_info_addr,
+        boot_info,
+    ) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("BOOT INFO PARSE FAILED: {:?}", error);
+            hlt_loop()
+        }
+    };
+
+    log_boot_info(boot_info);
     println!("Hello from WinnieOS!");
     hlt_loop()
 }
