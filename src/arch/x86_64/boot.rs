@@ -91,6 +91,13 @@ global_asm!(
         df_ist_stack_page:
             .skip 4096
 
+        # preserve the Multiboot2 loader handoff outside the small Rust kernel stack
+        .align 8
+        multiboot_magic_slot:
+            .skip 8
+        multiboot_info_ptr_slot:
+            .skip 8
+
         .align 4096
         p4_table:
             .skip 4096
@@ -122,6 +129,10 @@ global_asm!(
         _start:
             mov esp, OFFSET stack_top
             lgdt [gdt64_descriptor32]
+
+            # preserve the Multiboot2 loader contract across bootstrap so Rust can validate and parse it later
+            mov [multiboot_magic_slot], eax
+            mov [multiboot_info_ptr_slot], ebx
 
             mov eax, OFFSET p3_low
             or eax, PAGE_PRESENT_WRITABLE
@@ -266,6 +277,10 @@ global_asm!(
             ltr ax
 
             mov rsp, KERNEL_STACK_TOP
+
+            # hand Multiboot2 magic and info pointer to Rust using the x86_64 SysV calling convention
+            mov edi, dword ptr [multiboot_magic_slot]
+            mov esi, dword ptr [multiboot_info_ptr_slot]
 
             mov rax, OFFSET kernel_main_high
             jmp rax
