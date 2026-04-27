@@ -1,10 +1,7 @@
-use core::fmt;
-
 const VGA_BUFFER: *mut u8 = 0xB8000 as *mut u8;
 const WIDTH: usize = 80;
 const HEIGHT: usize = 25;
 const COLOR: u8 = 0x0F; // white on black
-const WRITE_ERROR_MESSAGE: &[u8] = b"[vga fmt error]";
 
 static mut COL: usize = 0;
 static mut ROW: usize = 0;
@@ -49,7 +46,7 @@ fn write_byte(byte: u8) {
 /// This keeps all cursor movement and newline behavior centralized in
 /// [`write_byte`], which is the only place that touches the text buffer
 /// directly.
-fn write_bytes(bytes: &[u8]) {
+pub fn write_bytes(bytes: &[u8]) {
     for &byte in bytes {
         write_byte(byte);
     }
@@ -72,60 +69,4 @@ fn newline() {
         // Sound because clamping `ROW` preserves the invariant that it stays within the visible text buffer.
         unsafe { ROW = HEIGHT - 1 };
     }
-}
-
-/// Converts a formatting result into a fixed fallback byte string when needed.
-///
-/// The VGA backend keeps its failure path independent from `fmt` machinery so a
-/// formatting error can still produce a small, direct message on screen.
-fn fallback_bytes_for_write_result(result: fmt::Result) -> Option<&'static [u8]> {
-    match result {
-        Ok(()) => None,
-        Err(_) => Some(WRITE_ERROR_MESSAGE),
-    }
-}
-
-/// Emits a fixed fallback message if formatted VGA output fails.
-///
-/// This keeps the error path simple and visible during early kernel bring-up,
-/// where complex recovery is not desirable.
-fn handle_write_result(result: fmt::Result) {
-    // Keep the failure path out of `fmt` so console errors remain visible and simple.
-    if let Some(message) = fallback_bytes_for_write_result(result) {
-        write_bytes(message);
-    }
-}
-
-/// Stateless adapter that lowers formatted kernel output into VGA byte writes.
-///
-/// `Writer` does not own screen memory, cursor state, or synchronization. It is
-/// a thin bridge used by the early text-mode VGA backend while the kernel is
-/// still single-threaded and relies on the global `ROW` and `COL` cursor state.
-pub struct Writer;
-
-impl fmt::Write for Writer {
-    /// Lowers a formatted string slice into byte-wise VGA writes.
-    ///
-    /// `core::fmt` calls this method with already formatted `&str` fragments.
-    /// The implementation converts each fragment to bytes and feeds them through
-    /// [`write_bytes`], which in turn preserves the current newline handling and
-    /// cursor advancement in [`write_byte`]. This path assumes the same early
-    /// single-threaded environment as the rest of the VGA backend.
-    fn write_str(&mut self, s: &str) -> fmt::Result {
-        write_bytes(s.as_bytes());
-        Ok(())
-    }
-}
-
-/// Backend entry for higher-level console printing into the VGA text buffer.
-///
-/// This function receives the prebuilt [`fmt::Arguments`] produced by the
-/// console `print!` and `println!` macros, then delegates formatting to
-/// [`Writer`]. It is the current backend used during early kernel bring-up, so
-/// it relies on the VGA text buffer mapping, global cursor state, and the
-/// assumption that output remains single-threaded. It does not implement
-/// scrolling or any broader terminal state beyond the fixed 80x25 VGA buffer.
-pub fn _print(args: fmt::Arguments) {
-    use fmt::Write;
-    handle_write_result(Writer.write_fmt(args));
 }
