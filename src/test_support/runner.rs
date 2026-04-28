@@ -52,3 +52,13 @@ pub fn report_test_suite_success() -> ! {
     println!("{}", TEST_SUITE_OK_MARKER);
     exit_qemu(QemuExitCode::Success)
 }
+
+pub fn test_runner(tests: &[&dyn Testable]) {
+    report_test_suite_start();
+
+    for test in tests {
+        test.run();
+    }
+
+    report_test_suite_success();
+}
