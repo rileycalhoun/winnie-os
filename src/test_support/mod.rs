@@ -1,3 +1,18 @@
+/// Shared QEMU-specific test-environment helpers.
+pub use qemu::{QemuExitCode, exit_qemu};
+
+/// Shared test runner traits and serial-visible result markers.
+pub use runner::{
+    Testable, report_test_case_fail, report_test_case_pass, report_test_suite_start,
+    report_test_suite_success,
+};
+
+/// QEMU-only helpers for deterministic guest-directed process exit during tests.
+pub mod qemu;
+
+/// Shared test result reporting helpers used by later kernel test harness code.
+pub mod runner;
+
 /// Stable serial-visible marker for a kernel panic path.
 pub const PANIC_MARKER: &str = "PANIC";
 
