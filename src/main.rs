@@ -5,12 +5,13 @@
 
 use core::cell::UnsafeCell;
 
-use crate::boot_info::BootInfo;
+use crate::{boot_info::BootInfo, test_support::PANIC_MARKER};
 
 mod arch;
 mod boot_info;
 mod console;
 mod drivers;
+mod test_support;
 
 /// Wraps the single early-boot `BootInfo` instance in interior mutability.
 ///
@@ -62,13 +63,15 @@ fn log_boot_info(boot_info: &BootInfo) {
 /// state needed to execute Rust in the higher half, including the active kernel
 /// stack and the basic descriptor and paging setup performed before this handoff.
 /// This function first initializes the early serial debug path, then loads the
-/// IDT so exception handling is in place before emitting the current startup
-/// output. If serial initialization fails, the function reports that condition
-/// on VGA and continues with VGA-only console mirroring.
+/// IDT so exception handling is in place, parses the bootloader memory map into
+/// owned kernel storage, logs that parsed view, and then emits the current
+/// startup output. If serial initialization fails, the function reports that
+/// condition on VGA and continues with VGA-only console mirroring.
 ///
-/// After printing `Hello from WinnieOS!`, it hands control to [`hlt_loop`], which
-/// is the kernel's current terminal path. It never returns because there is no
-/// scheduler, idle task, or later boot stage to return to in the current system.
+/// After logging boot information and printing `Hello from WinnieOS!`, it hands
+/// control to [`hlt_loop`], which is the kernel's current terminal path. It
+/// never returns because there is no scheduler, idle task, or later boot stage
+/// to return to in the current system.
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     let serial_ready = drivers::serial::init().is_ok();
@@ -81,11 +84,8 @@ extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize)
     // Sound because early kernel bring-up is single-threaded and this storage
     // is initialized exactly once before any later shared access exists.
     let boot_info = unsafe { &mut *BOOT_INFO.0.get() };
-    match arch::x86_64::boot_info::parse_multiboot2(
-        multiboot_magic,
-        multiboot_info_addr,
-        boot_info,
-    ) {
+    match arch::x86_64::boot_info::parse_multiboot2(multiboot_magic, multiboot_info_addr, boot_info)
+    {
         Ok(()) => {}
         Err(error) => {
             println!("BOOT INFO PARSE FAILED: {:?}", error);
@@ -110,6 +110,6 @@ extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize)
 /// chooses a simple, auditable halt path over speculative recovery.
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
-    println!("PANIC");
+    println!("{}", PANIC_MARKER);
     hlt_loop()
 }
