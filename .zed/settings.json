@@ -3,12 +3,17 @@
     "rust-analyzer": {
       "initialization_options": {
         "cargo": {
-          "target": "targets/x86_64-kernel.json"
+          "target": "targets/x86_64-kernel.json",
+          "extraArgs": ["-Zjson-target-spec"],
+          "metadataExtraArgs": ["-Zjson-target-spec"],
+          "extraEnv": {
+            "RUSTUP_TOOLCHAIN": "nightly-aarch64-apple-darwin",
+          },
         },
         "check": {
-          "allTargets": false
-        }
-      }
-    }
-  }
+          "allTargets": false,
+        },
+      },
+    },
+  },
 }

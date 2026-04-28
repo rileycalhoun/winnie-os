@@ -99,7 +99,7 @@ pub fn parse_multiboot2(
             .ok_or(ParseError::TruncatedTag)?;
 
         if tag_header_end > info_end {
-            return Err(ParseError::TruncatedInfo);
+            return Err(ParseError::TruncatedTag);
         }
 
         // Sound because `current..tag_header_end` was validated to lie fully
