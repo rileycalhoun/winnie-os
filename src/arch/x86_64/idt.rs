@@ -1,6 +1,12 @@
 use core::mem::size_of;
 
-use crate::println;
+use crate::{
+    println,
+    test_support::{
+        DIVIDE_ERROR_MARKER, DOUBLE_FAULT_MARKER, GENERAL_PROTECTION_MARKER, INVALID_OPCODE_MARKER,
+        PAGE_FAULT_MARKER,
+    },
+};
 
 /// One 16-byte x86_64 interrupt descriptor table entry.
 ///
@@ -140,7 +146,7 @@ pub struct InterruptFrame {
 /// which keeps early destructive fault handling simple and auditable in the
 /// higher-half kernel.
 pub extern "x86-interrupt" fn divide_error_handler(_frame: &InterruptFrame) -> ! {
-    println!("DIVIDE ERROR");
+    println!("{}", DIVIDE_ERROR_MARKER);
     crate::hlt_loop()
 }
 
@@ -150,7 +156,7 @@ pub extern "x86-interrupt" fn divide_error_handler(_frame: &InterruptFrame) -> !
 /// avoids complex recovery and instead emits a fixed message before terminating
 /// in [`crate::hlt_loop`].
 pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) -> ! {
-    println!("INVALID OPCODE");
+    println!("{}", INVALID_OPCODE_MARKER);
     crate::hlt_loop()
 }
 
@@ -166,11 +172,8 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) ->
 /// bootstrap code, which avoids relying on a possibly corrupted current stack.
 /// The implementation stays intentionally minimal and terminal by printing a
 /// fixed message and then entering [`crate::hlt_loop`].
-pub extern "x86-interrupt" fn double_fault_handler(
-    _frame: &InterruptFrame,
-    _error_code: u64,
-) -> ! {
-    println!("DOUBLE FAULT");
+pub extern "x86-interrupt" fn double_fault_handler(_frame: &InterruptFrame, _error_code: u64) -> ! {
+    println!("{}", DOUBLE_FAULT_MARKER);
     crate::hlt_loop()
 }
 
@@ -184,7 +187,7 @@ pub extern "x86-interrupt" fn general_protection_handler(
     _frame: &InterruptFrame,
     _error_code: u64,
 ) -> ! {
-    println!("GENERAL PROTECTION FAULT");
+    println!("{}", GENERAL_PROTECTION_MARKER);
     crate::hlt_loop()
 }
 
@@ -196,11 +199,8 @@ pub extern "x86-interrupt" fn general_protection_handler(
 /// invariant that `#PF` runs on its dedicated IST stack. The implementation is
 /// intentionally minimal: it prints a fixed message and terminates in
 /// [`crate::hlt_loop`].
-pub extern "x86-interrupt" fn page_fault_handler(
-    _frame: &InterruptFrame,
-    _error_code: u64,
-) -> ! {
-    println!("PAGE FAULT");
+pub extern "x86-interrupt" fn page_fault_handler(_frame: &InterruptFrame, _error_code: u64) -> ! {
+    println!("{}", PAGE_FAULT_MARKER);
     crate::hlt_loop()
 }
 
