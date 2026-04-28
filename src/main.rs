@@ -4,6 +4,13 @@
 #![test_runner(winnie_os::test_support::runner::test_runner)]
 #![reexport_test_harness_main = "test_main"]
 
+/// Bridges the architecture bootstrap handoff into either the normal kernel
+/// runtime or the bootable test harness, depending on the current build mode.
+///
+/// This function performs the common early bring-up shared by both paths:
+/// initialize serial output, load the IDT, and fall back to VGA-only reporting
+/// if serial initialization fails. Test builds then dispatch into the generated
+/// `test_main`, while non-test builds continue into [`winnie_os::kernel_main`].
 #[unsafe(no_mangle)]
 extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     let serial_ready = winnie_os::drivers::serial::init().is_ok();
@@ -49,6 +56,7 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
 }
 
 #[cfg(test)]
+/// Minimal smoke test proving the bootable kernel test harness can execute.
 #[test_case]
 fn trivial_assertion() {
     assert_eq!(1, 1);

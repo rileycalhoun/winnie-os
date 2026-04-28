@@ -63,19 +63,15 @@ fn log_boot_info(boot_info: &BootInfo) {
 /// At this point the early boot path has already established the current machine
 /// state needed to execute Rust in the higher half, including the active kernel
 /// stack and the basic descriptor and paging setup performed before this handoff.
-/// This function first initializes the early serial debug path, then loads the
-/// IDT so exception handling is in place. In normal boot builds it then parses
+/// The current binary entrypoint is responsible for initializing serial output
+/// and loading the IDT before calling this function. `kernel_main` then parses
 /// the bootloader memory map into owned kernel storage, logs that parsed view,
-/// and emits the current startup output. In test builds it instead dispatches
-/// into the custom test harness after the same early bring-up work. If serial
-/// initialization fails, the function reports that condition on VGA and
-/// continues with VGA-only console mirroring.
+/// and emits the current startup output.
 ///
-/// After either running the test harness or logging boot information and
-/// printing `Hello from WinnieOS!`, it hands control to [`hlt_loop`], which is
-/// the kernel's current terminal path. It never returns because there is no
-/// scheduler, idle task, or later boot stage to return to in the current
-/// system.
+/// After logging boot information and printing `Hello from WinnieOS!`, it hands
+/// control to [`hlt_loop`], which is the kernel's current terminal path. It
+/// never returns because there is no scheduler, idle task, or later boot stage
+/// to return to in the current system.
 pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     // Sound because early kernel bring-up is single-threaded and this storage
     // is initialized exactly once before any later shared access exists.
