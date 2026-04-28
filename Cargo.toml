@@ -9,4 +9,10 @@ panic = "abort"
 [profile.release]
 panic = "abort"
 
+[[bin]]
+name = "winnie-os"
+path = "src/main.rs"
+test = true
+bench = false
+
 [dependencies]
