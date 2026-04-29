@@ -1,5 +1,5 @@
 use crate::{
-    println,
+    print, println,
     test_support::qemu::{QemuExitCode, exit_qemu},
 };
 
@@ -26,6 +26,7 @@ where
 {
     /// Runs one test case and reports a passing result if it returns normally.
     fn run(&self) {
+        print!("{} ", core::any::type_name::<T>());
         self();
         report_test_case_pass();
     }

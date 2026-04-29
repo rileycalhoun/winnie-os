@@ -9,6 +9,9 @@ use winnie_os::{
     test_support::{BootScenario, PANIC_MARKER, QemuExitCode},
 };
 
+#[cfg(test)]
+mod kernel_tests;
+
 /// Bridges the architecture bootstrap handoff into the normal runtime, the
 /// bootable test harness, or one dedicated destructive test scenario.
 ///
@@ -116,11 +119,4 @@ fn panic(_info: &core::panic::PanicInfo) -> ! {
         }
         _ => winnie_os::panic_halt(),
     }
-}
-
-#[cfg(test)]
-/// Minimal smoke test proving the bootable kernel test harness can execute.
-#[test_case]
-fn trivial_assertion() {
-    assert_eq!(1, 1);
 }
