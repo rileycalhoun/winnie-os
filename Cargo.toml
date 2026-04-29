@@ -15,4 +15,12 @@ path = "src/main.rs"
 test = true
 bench = false
 
+[features]
+default = []
+test-panic = []
+test-invalid-opcode = []
+test-general-protection = []
+test-page-fault = []
+test-double-fault = []
+
 [dependencies]

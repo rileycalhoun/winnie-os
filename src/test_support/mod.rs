@@ -7,11 +7,16 @@ pub use runner::{
     report_test_suite_success,
 };
 
+pub use scenarios::{BootScenario, selected_boot_scenario};
+
 /// QEMU-only helpers for deterministic guest-directed process exit during tests.
 pub mod qemu;
 
 /// Shared test result reporting helpers used by later kernel test harness code.
 pub mod runner;
+
+/// Compile-time boot-scenario selection for the harness and destructive tests.
+pub mod scenarios;
 
 /// Stable serial-visible marker for a kernel panic path.
 pub const PANIC_MARKER: &str = "PANIC";

@@ -153,11 +153,22 @@ pub extern "x86-interrupt" fn divide_error_handler(_frame: &InterruptFrame) -> !
 /// Handles vector 6, the invalid-opcode exception.
 ///
 /// The CPU does not supply an error code for this exception. The current path
-/// avoids complex recovery and instead emits a fixed message before terminating
-/// in [`crate::hlt_loop`].
+/// avoids complex recovery and instead emits a fixed message. Under the
+/// dedicated invalid-opcode test scenario, reaching this handler is treated as
+/// success and exits QEMU with the passing test code. The bootable test harness
+/// reports failure here, while normal builds retain the minimal terminal halt
+/// path.
 pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) -> ! {
     println!("{}", INVALID_OPCODE_MARKER);
-    crate::hlt_loop()
+    match crate::test_support::selected_boot_scenario() {
+        crate::test_support::BootScenario::InvalidOpcode => {
+            crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
+        }
+        crate::test_support::BootScenario::TestHarness => {
+            crate::test_support::report_test_case_fail()
+        }
+        _ => crate::hlt_loop(),
+    }
 }
 
 /*
@@ -170,25 +181,46 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) ->
 /// signature reflects that requirement exactly. Winnie OS installs `#DF` with
 /// IST1 so the handler runs on the dedicated double-fault stack established by
 /// bootstrap code, which avoids relying on a possibly corrupted current stack.
-/// The implementation stays intentionally minimal and terminal by printing a
-/// fixed message and then entering [`crate::hlt_loop`].
+/// Under the dedicated double-fault test scenario, reaching this handler is
+/// treated as success and exits QEMU with the passing test code. The bootable
+/// test harness reports failure here, while normal builds retain the minimal
+/// terminal halt path after printing the fixed marker.
 pub extern "x86-interrupt" fn double_fault_handler(_frame: &InterruptFrame, _error_code: u64) -> ! {
     println!("{}", DOUBLE_FAULT_MARKER);
-    crate::hlt_loop()
+    match crate::test_support::selected_boot_scenario() {
+        crate::test_support::BootScenario::DoubleFault => {
+            crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
+        }
+        crate::test_support::BootScenario::TestHarness => {
+            crate::test_support::report_test_case_fail()
+        }
+        _ => crate::hlt_loop(),
+    }
 }
 
 /// Handles vector 13, the general-protection exception.
 ///
 /// The CPU architecturally supplies an error code for `#GP`, so this handler
 /// accepts one even though the current implementation only reports a fixed
-/// message. The path remains minimal and terminates in [`crate::hlt_loop`]
-/// rather than attempting recovery from compromised kernel state.
+/// message. Under the dedicated general-protection test scenario, reaching this
+/// handler is treated as success and exits QEMU with the passing test code. The
+/// bootable test harness reports failure here, while normal builds retain the
+/// minimal terminal halt path rather than attempting recovery from compromised
+/// kernel state.
 pub extern "x86-interrupt" fn general_protection_handler(
     _frame: &InterruptFrame,
     _error_code: u64,
 ) -> ! {
     println!("{}", GENERAL_PROTECTION_MARKER);
-    crate::hlt_loop()
+    match crate::test_support::selected_boot_scenario() {
+        crate::test_support::BootScenario::GeneralProtection => {
+            crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
+        }
+        crate::test_support::BootScenario::TestHarness => {
+            crate::test_support::report_test_case_fail()
+        }
+        _ => crate::hlt_loop(),
+    }
 }
 
 /// Handles vector 14, the page-fault exception.
@@ -196,12 +228,23 @@ pub extern "x86-interrupt" fn general_protection_handler(
 /// The CPU architecturally supplies an error code for `#PF`, and Winnie OS
 /// installs this handler with IST2 so page faults do not depend on the current
 /// kernel stack remaining usable. This preserves the current fault-handling
-/// invariant that `#PF` runs on its dedicated IST stack. The implementation is
-/// intentionally minimal: it prints a fixed message and terminates in
-/// [`crate::hlt_loop`].
+/// invariant that `#PF` runs on its dedicated IST stack. Under the dedicated
+/// page-fault test scenario, reaching this handler is treated as success and
+/// exits QEMU with the passing test code. The bootable test harness reports
+/// failure here, while normal builds retain the minimal terminal halt path
+/// after printing the fixed marker.
 pub extern "x86-interrupt" fn page_fault_handler(_frame: &InterruptFrame, _error_code: u64) -> ! {
     println!("{}", PAGE_FAULT_MARKER);
-    crate::hlt_loop()
+
+    match crate::test_support::selected_boot_scenario() {
+        crate::test_support::BootScenario::PageFault => {
+            crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
+        }
+        crate::test_support::BootScenario::TestHarness => {
+            crate::test_support::report_test_case_fail()
+        }
+        _ => crate::hlt_loop(),
+    }
 }
 
 static mut IDT: Idt = Idt::new();
@@ -233,4 +276,18 @@ pub fn init() {
     unsafe { (*idt).set_with_ist(14, page_fault_handler as *const () as u64, 2) };
     // Sound because `idt` still points to the initialized static IDT for the duration of this call.
     unsafe { (*idt).load() };
+}
+
+/// Removes the page-fault handler entry so a deliberate `#PF` escalates to
+/// `#DF` during the dedicated double-fault test scenario.
+pub fn clear_page_fault_handler_for_double_fault_test() {
+    // Sound because this runs during single-threaded early bring-up for a
+    // dedicated destructive test scenario, with exclusive access to the IDT.
+    let idt = &raw mut IDT;
+
+    // Sound because `idt` is the loaded global IDT and vector 14 is
+    // intentionally cleared only for the dedicated double-fault test scenario.
+    unsafe {
+        (*idt).0[14] = IdtEntry::MISSING;
+    }
 }
