@@ -10,4 +10,7 @@ for feature in \
 do
     printf '==> running %s\n' "$feature"
     cargo run --features "$feature"
+    printf 'PASS %s\n' "$feature"
 done
+
+printf '%s\n' "FAULT SUITE OK"

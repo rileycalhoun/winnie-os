@@ -27,6 +27,7 @@ trap cleanup EXIT
 
 for _ in $(seq 1 50); do
     if grep -Fq "$BOOT_MARKER" "$SERIAL_LOG" 2>/dev/null; then
+        printf '%s\n' "SMOKE OK"
         exit 0
     fi
 
