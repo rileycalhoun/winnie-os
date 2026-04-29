@@ -20,7 +20,11 @@ As of this roadmap, the repository provides:
 - early paging setup
 - a TSS with dedicated IST stacks
 - a minimal IDT with a few fatal exception handlers
-- VGA text output
+- mirrored VGA and serial console output
+- Multiboot2 memory-map parsing into a small owned kernel structure
+- a bootable no-`std` kernel test harness
+- dedicated panic and fault test scenarios
+- scripted QEMU smoke, harness, and fault-test runners
 - a terminal `hlt` path after startup
 
 It does not yet provide:
@@ -97,10 +101,10 @@ Right now the kernel can boot and print, but almost every next subsystem depends
 
 ### Best next steps now
 
-1. Add serial output and make it the preferred debug channel for QEMU runs.
-2. Parse the bootloader memory map and preserve it in a small, explicit kernel structure.
-3. Add reproducible QEMU smoke tests for boot success, page fault handling, and double fault handling.
-4. Document the current boot verification workflow in the repo.
+1. Finish documenting the now-scripted smoke, harness, and fault-test workflows.
+2. Use the serial-first verification path as the default for Phase 1 memory and interrupt work.
+3. Build the physical memory manager on top of the owned boot memory map.
+4. Extend destructive test coverage only where later phases need new fault scenarios.
 
 ## Phase 1: Memory And Core Interrupts
 
