@@ -262,13 +262,16 @@ The second lane is for deliberate fatal conditions:
 - page fault
 - double fault
 
-These should use isolated test kernels or clearly separated boot entrypaths so each case:
+These should use one bootable kernel binary plus compile-time-selected boot
+scenarios so each case:
 
 - exercises one fault source intentionally
 - emits one expected serial marker
 - halts or exits in a way the QEMU wrapper can classify
 
-This separation matters because it avoids mixing intentionally destructive machine-state tests into the ordinary `#[test_case]` runner path.
+This separation matters because it avoids mixing intentionally destructive
+machine-state tests into the ordinary `#[test_case]` runner path while still
+preserving the same GRUB and Multiboot2 boot contract as normal boot.
 
 ## QEMU And Verification Strategy
 
@@ -311,7 +314,7 @@ Expected boundary changes:
 - introduce a small architecture-neutral `BootInfo` module
 - split console frontend logic from backend drivers
 - add a dedicated serial driver under `src/drivers/`
-- keep test harness entrypoints and destructive test kernels separate from the normal runtime path
+- keep harness dispatch and destructive scenarios separate from the normal runtime path
 - replace the one-shot build script with narrower scripts or cargo aliases
 
 ## Documentation Deliverables

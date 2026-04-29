@@ -52,18 +52,10 @@
 
 ### New test and entrypoint files to create
 
-- `tests/basic_boot.rs`
-  - integration harness smoke boot
-- `tests/panic.rs`
-  - dedicated panic-path test kernel
-- `tests/invalid_opcode.rs`
-  - dedicated invalid-opcode test kernel
-- `tests/general_protection.rs`
-  - dedicated GP-fault test kernel
-- `tests/page_fault.rs`
-  - dedicated page-fault test kernel
-- `tests/double_fault.rs`
-  - dedicated double-fault test kernel
+- `src/lib.rs`
+  - shared kernel logic used by the bootable binary harness
+- `src/test_support/scenarios.rs`
+  - compile-time boot-scenario selection for the harness and destructive tests
 
 ### New tooling and docs files to create
 
@@ -82,9 +74,10 @@
 
 ### External docs expected to update during implementation
 
-- `~/Documents/winnie-os/architecture/Current Boot Flow.md`
-- `~/Documents/winnie-os/architecture/Current Memory Layout.md`
-- `~/Documents/winnie-os/architecture/Current Trap And Fault Handling.md`
+- `~/Documents/winnie-os/Handbook/Architecture/Current Boot Flow.md`
+- `~/Documents/winnie-os/Handbook/Architecture/Current Memory Layout.md`
+- `~/Documents/winnie-os/Handbook/Architecture/Current Trap And Fault Handling.md`
+- `~/Documents/winnie-os/Handbook/Reference/Build And Boot Pipeline.md`
 - a repo-facing verification doc if one is added during implementation
 
 ## Task 1: Establish The Phase 0 Console Split
@@ -334,10 +327,10 @@ git commit -m "feat(test): add qemu exit and shared test utilities"
 
 **Files:**
 
+- Create: `src/lib.rs`
 - Modify: `src/main.rs`
 - Modify: `Cargo.toml`
 - Modify: `.cargo/config.toml`
-- Create: `tests/basic_boot.rs`
 
 - [ ] **Step 1: Enable the Phil Opp-style custom test framework flow**
 
@@ -361,11 +354,11 @@ The runner should:
 - print structured pass/fail lines
 - exit QEMU successfully on completion
 
-- [ ] **Step 3: Add the first integration test kernel**
+- [ ] **Step 3: Add the first bootable integration smoke test**
 
-Create `tests/basic_boot.rs` as the minimal smoke harness:
+Keep the test in the bootable main binary:
 
-- boot into the test path
+- boot into the `cfg(test)` harness path
 - run one trivial assertion
 - report success over serial
 - exit QEMU with the success code
@@ -384,21 +377,19 @@ Expected result:
 Suggested commit:
 
 ```bash
-git add src/main.rs Cargo.toml .cargo/config.toml tests/basic_boot.rs
+git add src/lib.rs src/main.rs Cargo.toml .cargo/config.toml
 git commit -m "feat(test): add no-std kernel integration harness"
 ```
 
-## Task 6: Add Dedicated Panic And Fault Test Kernels
+## Task 6: Add Dedicated Panic And Fault Test Scenarios
 
 **Files:**
 
-- Create: `tests/panic.rs`
-- Create: `tests/invalid_opcode.rs`
-- Create: `tests/general_protection.rs`
-- Create: `tests/page_fault.rs`
-- Create: `tests/double_fault.rs`
-- Modify: `src/arch/x86_64/idt.rs` only if a test-only hook is strictly needed
+- Create: `src/test_support/scenarios.rs`
+- Modify: `src/main.rs`
+- Modify: `src/arch/x86_64/idt.rs`
 - Modify: `src/test_support/mod.rs`
+- Modify: `Cargo.toml`
 
 - [ ] **Step 1: Define one expected outcome contract per destructive test**
 
@@ -408,27 +399,27 @@ Each destructive test must declare:
 - the exact expected serial marker
 - whether success is detected by QEMU exit code, terminal halt plus log match, or both
 
-- [ ] **Step 2: Add the panic-path test kernel**
+- [ ] **Step 2: Add the panic-path test scenario**
 
-Implement a dedicated panic test that:
+Implement a compile-time-selected panic scenario that:
 
-- boots into a test-only path
+- boots through the normal main binary
 - intentionally panics
 - emits the expected marker
 - exits or halts in the expected way for the wrapper script
 
 - [ ] **Step 3: Add invalid-opcode and general-protection tests**
 
-Implement one dedicated kernel each.
+Implement one compile-time-selected scenario each.
 
 Rules:
 
 - keep the trigger local and obvious
 - do not reuse a generalized “fault injector”
 
-- [ ] **Step 4: Add page-fault and double-fault tests**
+- [ ] **Step 4: Add page-fault and double-fault scenarios**
 
-Implement one dedicated kernel each.
+Implement one compile-time-selected scenario each.
 
 Critical verification points:
 
@@ -447,7 +438,7 @@ Expected result:
 Suggested commit:
 
 ```bash
-git add tests/panic.rs tests/invalid_opcode.rs tests/general_protection.rs tests/page_fault.rs tests/double_fault.rs src/test_support/mod.rs src/arch/x86_64/idt.rs
+git add Cargo.toml src/main.rs src/test_support/mod.rs src/test_support/scenarios.rs src/arch/x86_64/idt.rs
 git commit -m "feat(test): add destructive fault kernel tests"
 ```
 

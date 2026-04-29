@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-BUILD_SCRIPT := ./build.sh
+BUILD_SCRIPT := ./scripts/build-image.sh
 SMOKE_SCRIPT := ./scripts/run-qemu-smoke.sh
 TEST_SCRIPT := ./scripts/run-qemu-tests.sh
 FAULTS_SCRIPT := ./scripts/run-qemu-fault-tests.sh
@@ -10,39 +10,37 @@ FAULTS_SCRIPT := ./scripts/run-qemu-fault-tests.sh
 help:
 	@printf '%s\n' \
 		'Available targets:' \
-		'  make build   - compile the kernel only' \
-		'  make run     - build the ISO and boot it in QEMU' \
-		'  make smoke   - run the dedicated smoke script when it exists' \
-		'  make test    - run the bootable kernel test harness in QEMU' \
-		'  make faults  - run the dedicated fault-test script when it exists'
+		'  make build   - build the kernel image and bootable ISO' \
+		'  make run     - run the headless smoke boot check' \
+		'  make smoke   - run the dedicated smoke boot check' \
+		'  make test    - run the bootable kernel test harness' \
+		'  make faults  - run all dedicated fault-test scenarios'
 
 build:
-	cargo build
+	bash $(BUILD_SCRIPT)
 
 run:
-	$(BUILD_SCRIPT)
+	bash $(SMOKE_SCRIPT)
 
 smoke:
-	@if [ -x "$(SMOKE_SCRIPT)" ]; then \
-		$(SMOKE_SCRIPT); \
+	@if [ -f "$(SMOKE_SCRIPT)" ]; then \
+		bash $(SMOKE_SCRIPT); \
 	else \
 		printf '%s\n' 'Missing ./scripts/run-qemu-smoke.sh; use `make run` for the current build path.'; \
 		exit 1; \
 	fi
 
 test:
-	@if [ -f "./src/main.rs" ]; then \
-		cargo test --bin winnie-os; \
-	elif [ -x "$(TEST_SCRIPT)" ]; then \
-		$(TEST_SCRIPT); \
+	@if [ -f "$(TEST_SCRIPT)" ]; then \
+		bash $(TEST_SCRIPT); \
 	else \
-		printf '%s\n' 'Missing the bootable kernel test entrypoint and ./scripts/run-qemu-tests.sh; no integration test path exists yet.'; \
+		printf '%s\n' 'Missing ./scripts/run-qemu-tests.sh; no integration test path exists yet.'; \
 		exit 1; \
 	fi
 
 faults:
-	@if [ -x "$(FAULTS_SCRIPT)" ]; then \
-		$(FAULTS_SCRIPT); \
+	@if [ -f "$(FAULTS_SCRIPT)" ]; then \
+		bash $(FAULTS_SCRIPT); \
 	else \
 		printf '%s\n' 'Missing ./scripts/run-qemu-fault-tests.sh; Task 7 has not landed yet.'; \
 		exit 1; \
