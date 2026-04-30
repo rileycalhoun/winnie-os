@@ -160,7 +160,7 @@ pub extern "x86-interrupt" fn divide_error_handler(_frame: &InterruptFrame) -> !
 /// path.
 pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) -> ! {
     println!("{}", INVALID_OPCODE_MARKER);
-    match crate::test_support::selected_boot_scenario() {
+    match crate::test_support::active_boot_scenario() {
         crate::test_support::BootScenario::InvalidOpcode => {
             crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
         }
@@ -187,7 +187,7 @@ pub extern "x86-interrupt" fn invalid_opcode_handler(_frame: &InterruptFrame) ->
 /// terminal halt path after printing the fixed marker.
 pub extern "x86-interrupt" fn double_fault_handler(_frame: &InterruptFrame, _error_code: u64) -> ! {
     println!("{}", DOUBLE_FAULT_MARKER);
-    match crate::test_support::selected_boot_scenario() {
+    match crate::test_support::active_boot_scenario() {
         crate::test_support::BootScenario::DoubleFault => {
             crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
         }
@@ -212,7 +212,7 @@ pub extern "x86-interrupt" fn general_protection_handler(
     _error_code: u64,
 ) -> ! {
     println!("{}", GENERAL_PROTECTION_MARKER);
-    match crate::test_support::selected_boot_scenario() {
+    match crate::test_support::active_boot_scenario() {
         crate::test_support::BootScenario::GeneralProtection => {
             crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
         }
@@ -236,7 +236,7 @@ pub extern "x86-interrupt" fn general_protection_handler(
 pub extern "x86-interrupt" fn page_fault_handler(_frame: &InterruptFrame, _error_code: u64) -> ! {
     println!("{}", PAGE_FAULT_MARKER);
 
-    match crate::test_support::selected_boot_scenario() {
+    match crate::test_support::active_boot_scenario() {
         crate::test_support::BootScenario::PageFault => {
             crate::test_support::exit_qemu(crate::test_support::QemuExitCode::Success)
         }

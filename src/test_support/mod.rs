@@ -7,7 +7,9 @@ pub use runner::{
     report_test_suite_success,
 };
 
-pub use scenarios::{BootScenario, selected_boot_scenario};
+pub use scenarios::{
+    BootScenario, active_boot_scenario, selected_boot_scenario, set_active_boot_scenario,
+};
 
 /// QEMU-only helpers for deterministic guest-directed process exit during tests.
 pub mod qemu;

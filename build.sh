@@ -2,12 +2,19 @@
 set -euo pipefail
 
 ARTIFACT_PATH="${1:?expected kernel artifact path}"
+ISO_PATH="$(mktemp "${TMPDIR:-/tmp}/winnie-test.XXXXXX.iso")"
 
-bash ./scripts/build-image.sh "$ARTIFACT_PATH"
+cleanup() {
+    rm -f "$ISO_PATH"
+}
+
+trap cleanup EXIT
+
+BUILD_IMAGE_OUTPUT_ISO="$ISO_PATH" bash ./scripts/build-image.sh "$ARTIFACT_PATH"
 
 set +e
 qemu-system-x86_64 \
-    -cdrom winnie.iso \
+    -cdrom "$ISO_PATH" \
     -no-reboot \
     -display none \
     -serial stdio \

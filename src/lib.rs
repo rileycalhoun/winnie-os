@@ -6,9 +6,8 @@ use core::cell::UnsafeCell;
 use crate::boot_info::BootInfo;
 use crate::test_support::PANIC_MARKER;
 
-mod boot_info;
-
 pub mod arch;
+pub mod boot_info;
 pub mod console;
 pub mod drivers;
 pub mod memory;

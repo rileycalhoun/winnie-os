@@ -1,6 +1,7 @@
 .DEFAULT_GOAL := help
 
 BUILD_SCRIPT := ./scripts/build-image.sh
+RUN_SCRIPT := ./scripts/run-qemu.sh
 SMOKE_SCRIPT := ./scripts/run-qemu-smoke.sh
 TEST_SCRIPT := ./scripts/run-qemu-tests.sh
 FAULTS_SCRIPT := ./scripts/run-qemu-fault-tests.sh
@@ -11,8 +12,8 @@ help:
 	@printf '%s\n' \
 		'Available targets:' \
 		'  make build   - build the kernel image and bootable ISO' \
-		'  make run     - run the headless smoke boot check' \
-		'  make smoke   - run the dedicated smoke boot check' \
+		'  make run     - run the kernel in an interactive QEMU window' \
+		'  make smoke   - run the headless smoke boot check' \
 		'  make test    - run the bootable kernel test harness' \
 		'  make faults  - run all dedicated fault-test scenarios'
 
@@ -20,7 +21,7 @@ build:
 	bash $(BUILD_SCRIPT)
 
 run:
-	bash $(SMOKE_SCRIPT)
+	bash $(RUN_SCRIPT)
 
 smoke:
 	@if [ -f "$(SMOKE_SCRIPT)" ]; then \
