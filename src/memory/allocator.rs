@@ -9,7 +9,7 @@ use crate::{
 pub enum AllocatorInitError {
     RegionOverflow,
     BadFrameRegion,
-    TooManyUsableRegions,
+    TooManyAllocatableRegions,
 }
 
 /// One normalized usable physical-frame interval stored by the allocator.
@@ -159,7 +159,7 @@ impl MonotonicFrameAllocator {
             .ok_or(AllocatorInitError::BadFrameRegion)?;
 
         if self.region_count >= MAX_ALLOCATABLE_FRAME_REGIONS {
-            return Err(AllocatorInitError::TooManyUsableRegions);
+            return Err(AllocatorInitError::TooManyAllocatableRegions);
         }
 
         self.regions[self.region_count] = UsableFrameRegion {
@@ -209,7 +209,7 @@ impl MonotonicFrameAllocator {
                 for fragment in fragments.iter().flatten() {
                     for piece in subtract_range(*fragment, reserved).iter().flatten() {
                         if next_count >= MAX_REGION_FRAGMENTS {
-                            return Err(AllocatorInitError::TooManyUsableRegions);
+                            return Err(AllocatorInitError::TooManyAllocatableRegions);
                         }
 
                         next_fragments[next_count] = Some(*piece);
