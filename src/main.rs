@@ -37,6 +37,8 @@ extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize)
     #[cfg(not(test))]
     let scenario = winnie_os::test_support::selected_boot_scenario();
 
+    winnie_os::test_support::set_active_boot_scenario(scenario);
+
     match scenario {
         BootScenario::Normal => winnie_os::kernel_main(multiboot_magic, multiboot_info_addr),
         BootScenario::TestHarness => {
@@ -108,7 +110,7 @@ extern "C" fn kernel_main_high(multiboot_magic: u32, multiboot_info_addr: usize)
 /// failure. All other builds use the normal fatal kernel halt path.
 #[panic_handler]
 fn panic(_info: &core::panic::PanicInfo) -> ! {
-    match winnie_os::test_support::selected_boot_scenario() {
+    match winnie_os::test_support::active_boot_scenario() {
         BootScenario::Panic => {
             winnie_os::println!("{}", PANIC_MARKER);
             winnie_os::test_support::exit_qemu(QemuExitCode::Success)
