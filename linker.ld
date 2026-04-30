@@ -4,6 +4,7 @@ KERNEL_VIRT_BASE = 0xffffffff80000000;
 
 SECTIONS {
     . = 0x00100000;
+    __boot_phys_start = .;
 
     .multiboot ALIGN(8) : {
         KEEP(*(.multiboot))
@@ -26,7 +27,8 @@ SECTIONS {
         *(.boot.bss .boot.bss.*)
     }
 
-    __boot_end = ALIGN(., 4096);
+    __boot_phys_end = ALIGN(., 4096);
+    __boot_end = __boot_phys_end;
 
     . = __boot_end + KERNEL_VIRT_BASE;
 

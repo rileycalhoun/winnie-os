@@ -4,6 +4,7 @@
 use core::cell::UnsafeCell;
 
 use crate::boot_info::BootInfo;
+use crate::memory::allocator::MonotonicFrameAllocator;
 use crate::test_support::PANIC_MARKER;
 
 pub mod arch;
@@ -24,6 +25,19 @@ struct BootInfoStorage(UnsafeCell<BootInfo>);
 // access exists while this storage is initialized and then read.
 unsafe impl Sync for BootInfoStorage {}
 static BOOT_INFO: BootInfoStorage = BootInfoStorage(UnsafeCell::new(BootInfo::new()));
+
+/// Wraps the single early-boot frame allocator in interior mutability.
+///
+/// Phase 1 keeps allocator state in static storage for the same reason as
+/// `BOOT_INFO`: fixed-capacity subsystem state is too large for the guarded
+/// early kernel stack during bring-up and tests.
+struct FrameAllocatorStorage(UnsafeCell<MonotonicFrameAllocator>);
+
+// Sound because early kernel bring-up is still single-threaded, so no
+// concurrent access exists while the allocator is initialized and sampled.
+unsafe impl Sync for FrameAllocatorStorage {}
+static FRAME_ALLOCATOR: FrameAllocatorStorage =
+    FrameAllocatorStorage(UnsafeCell::new(MonotonicFrameAllocator::empty()));
 
 /// Enters the kernel's terminal halt path by repeatedly executing `hlt`.
 ///
@@ -57,6 +71,23 @@ fn log_boot_info(boot_info: &BootInfo) {
     }
 }
 
+/// Emits a small serial-visible sample from the current frame allocator state.
+fn log_allocator_sample(allocator: &mut MonotonicFrameAllocator) {
+    println!("FRAME ALLOC: initialized");
+
+    for _ in 0..3 {
+        match allocator.allocate_frame() {
+            Some(frame) => {
+                println!("FRAME base={:#018x}", frame.start_address().as_u64());
+            }
+            None => {
+                println!("FRAME ALLOC: exhausted");
+                break;
+            }
+        }
+    }
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -85,7 +116,19 @@ pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
         }
     };
 
+    // Sound because early kernel bring-up is single-threaded and this storage
+    // is initialized exactly once before any later shared access exists.
+    let allocator = unsafe { &mut *FRAME_ALLOCATOR.0.get() };
+    match allocator.initialize_from_boot_info(boot_info) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("FRAME ALLOC INIT FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+
     log_boot_info(boot_info);
+    log_allocator_sample(allocator);
     println!("Hello from WinnieOS!");
     hlt_loop()
 }
