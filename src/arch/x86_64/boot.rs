@@ -55,6 +55,20 @@ global_asm!(
         .extern __kernel_virt_start
         .extern __kernel_virt_end
 
+        .global kernel_stack_page0
+        .global kernel_stack_page1
+        .global pf_ist_stack_page
+        .global df_ist_stack_page
+
+        .global p4_table
+        .global p3_low
+        .global p2_low
+        .global p1_low
+        .global p3_high
+        .global p2_high
+        .global p1_high_kernel
+        .global p1_high_stack
+
         .section .multiboot, "a"
         .align 8
         .long 0xe85250d6
@@ -282,6 +296,9 @@ global_asm!(
             mov edi, dword ptr [multiboot_magic_slot]
             mov esi, dword ptr [multiboot_info_ptr_slot]
 
+            # emulate the missing return-address slot so Rust sees the stack
+            # alignment expected at normal SysV function entry
+            sub rsp, 8
             mov rax, OFFSET kernel_main_high
             jmp rax
         .halt:
