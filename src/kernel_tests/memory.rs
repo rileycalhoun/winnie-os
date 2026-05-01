@@ -5,7 +5,10 @@ mod mem_tests {
     use winnie_os::{
         arch::x86_64::reserved,
         boot_info::{BootInfo, MemoryRegion, MemoryRegionKind},
-        memory::{FRAME_SIZE, PhysicalAddress, PhysicalFrame, allocator::MonotonicFrameAllocator},
+        memory::{
+            FRAME_SIZE, PhysicalAddress, PhysicalFrame,
+            allocator::{FreeError, MonotonicFrameAllocator},
+        },
     };
 
     fn region(base: u64, length: u64, kind: MemoryRegionKind) -> MemoryRegion {
@@ -127,5 +130,50 @@ mod mem_tests {
             first_frame_after_reserved
         );
         assert!(allocator.allocate_frame().is_none());
+    }
+
+    /// Verifies runtime-owned frames can be freed and reused while invalid frees fail.
+    #[test_case]
+    fn monotonic_allocator_reuses_freed_frames_and_rejects_invalid_frees() {
+        // Sound because the bootable kernel test harness executes tests
+        // serially, and this fixture storage is reused by only one test at a
+        // time.
+        let boot_info = unsafe { &mut *TEST_BOOT_INFO.0.get() };
+        *boot_info = BootInfo::new();
+        boot_info
+            .push_region(region(0x0000, 0x1000, MemoryRegionKind::Reserved))
+            .unwrap();
+        boot_info
+            .push_region(region(0x1000, 0x3000, MemoryRegionKind::Usable))
+            .unwrap();
+
+        // Sound because the bootable kernel test harness executes tests
+        // serially, and this fixture storage is reused by only one test at a
+        // time.
+        let allocator = unsafe { &mut *TEST_MONOTONIC_ALLOCATOR.0.get() };
+        allocator.initialize_from_boot_info(boot_info).unwrap();
+
+        let first_frame = allocator.allocate_frame().unwrap();
+        let second_frame = allocator.allocate_frame().unwrap();
+
+        assert_eq!(first_frame.start_address(), PhysicalAddress::new(0x1000));
+        assert_eq!(second_frame.start_address(), PhysicalAddress::new(0x2000));
+
+        assert_eq!(allocator.free(first_frame), Ok(()));
+        assert_eq!(allocator.allocate_frame(), Some(first_frame));
+
+        let reserved_frame =
+            PhysicalFrame::from_start_address(reserved::boot_phys_start().align_down()).unwrap();
+        assert_eq!(
+            allocator.free(reserved_frame),
+            Err(FreeError::ReservedFrame)
+        );
+
+        let unmanaged_frame =
+            PhysicalFrame::from_start_address(PhysicalAddress::new(0x9000)).unwrap();
+        assert_eq!(
+            allocator.free(unmanaged_frame),
+            Err(FreeError::UnmanagedFrame)
+        );
     }
 }
