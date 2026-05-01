@@ -12,6 +12,7 @@ pub mod boot_info;
 pub mod console;
 pub mod drivers;
 pub mod memory;
+pub mod sync;
 pub mod test_support;
 
 /// Wraps the single early-boot `BootInfo` instance in interior mutability.
