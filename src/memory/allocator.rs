@@ -101,17 +101,23 @@ fn subtract_range(usable: PhysicalRange, reserved: PhysicalRange) -> [Option<Phy
     }
 
     if overlap_start <= usable_start {
-        return [Some(physical_range(
-            PhysicalAddress::new(overlap_end),
-            usable.end_exclusive,
-        )), None];
+        return [
+            Some(physical_range(
+                PhysicalAddress::new(overlap_end),
+                usable.end_exclusive,
+            )),
+            None,
+        ];
     }
 
     if overlap_end >= usable_end {
-        return [Some(physical_range(
-            usable.start,
-            PhysicalAddress::new(overlap_start),
-        )), None];
+        return [
+            Some(physical_range(
+                usable.start,
+                PhysicalAddress::new(overlap_start),
+            )),
+            None,
+        ];
     }
 
     return [
@@ -139,10 +145,7 @@ impl MonotonicFrameAllocator {
 
     /// Normalizes one remaining usable physical span and appends it if a full
     /// 4 KiB frame still fits after alignment.
-    fn push_allocatable_range(
-        &mut self,
-        range: PhysicalRange,
-    ) -> Result<(), AllocatorInitError> {
+    fn push_allocatable_range(&mut self, range: PhysicalRange) -> Result<(), AllocatorInitError> {
         let aligned_start = range
             .start
             .checked_align_up()

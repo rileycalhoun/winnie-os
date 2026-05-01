@@ -90,7 +90,9 @@ mod mem_tests {
     fn monotonic_allocator_skips_kernel_owned_reserved_ranges() {
         let reserved_start = reserved::boot_phys_start().as_u64();
         let reserved_end = reserved::kernel_phys_end().as_u64();
-        let first_frame_after_reserved = PhysicalAddress::new(reserved_end).checked_align_up().unwrap();
+        let first_frame_after_reserved = PhysicalAddress::new(reserved_end)
+            .checked_align_up()
+            .unwrap();
         let usable_start = reserved_start.checked_sub(FRAME_SIZE).unwrap();
         let usable_end = first_frame_after_reserved
             .as_u64()

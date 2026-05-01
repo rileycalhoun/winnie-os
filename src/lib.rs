@@ -88,6 +88,55 @@ fn log_allocator_sample(allocator: &mut MonotonicFrameAllocator) {
     }
 }
 
+/// Proves the runtime mapper can install and remove one higher-half 4 KiB page.
+fn log_runtime_mapping_sample(allocator: &mut MonotonicFrameAllocator) {
+    let frame = match allocator.allocate_frame() {
+        Some(frame) => frame,
+        None => {
+            println!("PAGING MAP FAILED: allocator exhausted");
+            hlt_loop()
+        }
+    };
+
+    match arch::x86_64::paging::map_kernel_page(
+        arch::x86_64::paging::RUNTIME_SCRATCH_PAGE_VIRT_ADDR,
+        frame,
+    ) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("PAGING MAP FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+
+    let scratch_page = arch::x86_64::paging::RUNTIME_SCRATCH_PAGE_VIRT_ADDR as *mut u64;
+
+    // Sound because the runtime mapper just installed a writable 4 KiB mapping
+    // at `RUNTIME_SCRATCH_PAGE_VIRT_ADDR`, so one volatile write/read through
+    // that address stays within the mapped page under test.
+    let mapped_value = unsafe {
+        core::ptr::write_volatile(scratch_page, 0x1122_3344_5566_7788);
+        core::ptr::read_volatile(scratch_page)
+    };
+
+    if mapped_value != 0x1122_3344_5566_7788 {
+        println!("PAGING MAP FAILED: verification mismatch");
+        hlt_loop()
+    }
+
+    match arch::x86_64::paging::unmap_kernel_page(
+        arch::x86_64::paging::RUNTIME_SCRATCH_PAGE_VIRT_ADDR,
+    ) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("PAGING UNMAP FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+
+    println!("PAGING MAP OK");
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -128,7 +177,11 @@ pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     }
 
     log_boot_info(boot_info);
+    println!();
     log_allocator_sample(allocator);
+    println!();
+    log_runtime_mapping_sample(allocator);
+    println!();
     println!("Hello from WinnieOS!");
     hlt_loop()
 }

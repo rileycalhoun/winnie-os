@@ -36,24 +36,15 @@ static ACTIVE_BOOT_SCENARIO: AtomicU8 = AtomicU8::new(BootScenario::Normal as u8
 /// Destructive test features take precedence so each dedicated fault run
 /// produces exactly one intended behavior.
 pub const fn selected_boot_scenario() -> BootScenario {
-    #[cfg(feature = "test-panic")]
-    {
+    if cfg!(feature = "test-panic") {
         return BootScenario::Panic;
-    }
-    #[cfg(feature = "test-invalid-opcode")]
-    {
+    } else if cfg!(feature = "test-invalid-opcode") {
         return BootScenario::InvalidOpcode;
-    }
-    #[cfg(feature = "test-general-protection")]
-    {
+    } else if cfg!(feature = "test-general-protection") {
         return BootScenario::GeneralProtection;
-    }
-    #[cfg(feature = "test-page-fault")]
-    {
+    } else if cfg!(feature = "test-page-fault") {
         return BootScenario::PageFault;
-    }
-    #[cfg(feature = "test-double-fault")]
-    {
+    } else if cfg!(feature = "test-double-fault") {
         return BootScenario::DoubleFault;
     }
 
