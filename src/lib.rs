@@ -156,6 +156,25 @@ fn initialize_local_apic() {
     }
 }
 
+/// Programs the LAPIC timer for the first periodic interrupt proof.
+fn initialize_periodic_timer() {
+    match arch::x86_64::timer::initialize() {
+        Ok(()) => {
+            println!("{}", arch::x86_64::timer::TIMER_INIT_MARKER);
+        }
+        Err(error) => {
+            println!("TIMER INIT FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+}
+
+fn enable_interrupts() {
+    // Sound because the IDT, PIC masking, LAPIC, and timer path are all
+    // initialized before this point on the normal boot path.
+    unsafe { core::arch::asm!("sti", options(nomem, nostack, preserves_flags)) }
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -205,7 +224,9 @@ pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     println!();
     log_runtime_mapping_sample(allocator);
     println!();
+    initialize_periodic_timer();
     println!("Hello from WinnieOS!");
+    enable_interrupts();
     hlt_loop()
 }
 
