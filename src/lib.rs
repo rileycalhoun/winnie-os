@@ -137,6 +137,12 @@ fn log_runtime_mapping_sample(allocator: &mut MonotonicFrameAllocator) {
     println!("PAGING MAP OK");
 }
 
+/// Takes explicit ownership of the legacy PIC state for later APIC bring-up.
+fn initialize_legacy_pic() {
+    arch::x86_64::pic::mask_all();
+    println!("{}", arch::x86_64::pic::PIC_INIT_MARKER);
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -178,6 +184,7 @@ pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
         }
     }
 
+    initialize_legacy_pic();
     log_boot_info(boot_info);
     println!();
     log_allocator_sample(allocator);
