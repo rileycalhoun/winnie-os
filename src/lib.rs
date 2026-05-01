@@ -143,6 +143,19 @@ fn initialize_legacy_pic() {
     println!("{}", arch::x86_64::pic::PIC_INIT_MARKER);
 }
 
+/// Maps and enables the LAPIC through the runtime MMIO slot.
+fn initialize_local_apic() {
+    match arch::x86_64::apic::initialize() {
+        Ok(()) => {
+            println!("{}", arch::x86_64::apic::LAPIC_INIT_MARKER);
+        }
+        Err(error) => {
+            println!("LAPIC INIT FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -185,6 +198,7 @@ pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
     }
 
     initialize_legacy_pic();
+    initialize_local_apic();
     log_boot_info(boot_info);
     println!();
     log_allocator_sample(allocator);
