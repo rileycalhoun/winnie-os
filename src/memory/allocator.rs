@@ -1,7 +1,7 @@
 use crate::{
     arch,
     boot_info::{BootInfo, MAX_MEMORY_REGIONS, MemoryRegionKind},
-    memory::{PhysicalAddress, PhysicalFrame},
+    memory::{FRAME_SIZE, PhysicalAddress, PhysicalFrame},
 };
 
 /// Reports failure while normalizing usable boot-time regions into frame ranges.
@@ -9,7 +9,16 @@ use crate::{
 pub enum AllocatorInitError {
     RegionOverflow,
     BadFrameRegion,
-    TooManyUsableRegions,
+    TooManyAllocatableRegions,
+}
+
+/// Reports failure while returning one runtime-owned frame to the allocator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FreeError {
+    ReservedFrame,
+    UnmanagedFrame,
+    FrameAlreadyFreed,
+    FreedFrameOverflow,
 }
 
 /// One normalized usable physical-frame interval stored by the allocator.
@@ -29,12 +38,14 @@ const EMPTY_USABLE_FRAME_REGION: UsableFrameRegion = UsableFrameRegion {
     end_exclusive: PhysicalFrame::from_start_address(PhysicalAddress::new(0)).unwrap(),
 };
 
-/// Monotonically allocates 4 KiB physical frames from owned usable boot regions.
+/// Allocates 4 KiB physical frames from owned usable boot regions with LIFO reuse.
 pub struct MonotonicFrameAllocator {
     regions: [UsableFrameRegion; MAX_ALLOCATABLE_FRAME_REGIONS],
     region_count: usize,
     current_region: usize,
     next_frame: Option<PhysicalFrame>,
+    freed_frames: [Option<PhysicalFrame>; MAX_ALLOCATABLE_FRAME_REGIONS],
+    freed_count: usize,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -101,17 +112,23 @@ fn subtract_range(usable: PhysicalRange, reserved: PhysicalRange) -> [Option<Phy
     }
 
     if overlap_start <= usable_start {
-        return [Some(physical_range(
-            PhysicalAddress::new(overlap_end),
-            usable.end_exclusive,
-        )), None];
+        return [
+            Some(physical_range(
+                PhysicalAddress::new(overlap_end),
+                usable.end_exclusive,
+            )),
+            None,
+        ];
     }
 
     if overlap_end >= usable_end {
-        return [Some(physical_range(
-            usable.start,
-            PhysicalAddress::new(overlap_start),
-        )), None];
+        return [
+            Some(physical_range(
+                usable.start,
+                PhysicalAddress::new(overlap_start),
+            )),
+            None,
+        ];
     }
 
     return [
@@ -134,15 +151,87 @@ impl MonotonicFrameAllocator {
             region_count: 0,
             current_region: 0,
             next_frame: None,
+            freed_frames: [None; MAX_ALLOCATABLE_FRAME_REGIONS],
+            freed_count: 0,
         }
+    }
+
+    /// Returns whether `frame` lies inside one of the allocator-owned usable ranges.
+    fn is_allocatable_frame(&self, frame: PhysicalFrame) -> bool {
+        for region in self.regions.iter().take(self.region_count) {
+            let frame_addr = frame.start_address().as_u64();
+            let region_start = region.start.start_address().as_u64();
+            let region_end = region.end_exclusive.start_address().as_u64();
+
+            if frame_addr >= region_start && frame_addr < region_end {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// Returns whether `frame` lies inside one of the permanently reserved spans.
+    fn is_reserved_frame(frame: PhysicalFrame) -> bool {
+        let frame_start = frame.start_address().as_u64();
+        let frame_end = match frame_start.checked_add(FRAME_SIZE) {
+            Some(value) => value,
+            None => return false,
+        };
+        for reserved in collect_reserved_ranges() {
+            let reserved_start = reserved.start.as_u64();
+            let reserved_end = reserved.end_exclusive.as_u64();
+
+            if frame_start < reserved_end && frame_end > reserved_start {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// Returns whether the monotonic cursor has already handed out `frame` once.
+    fn was_monotonically_allocated(&self, frame: PhysicalFrame) -> bool {
+        if self.region_count == 0 {
+            return false;
+        }
+
+        if self.current_region >= self.region_count || self.next_frame.is_none() {
+            return self.is_allocatable_frame(frame);
+        }
+
+        let frame_addr = frame.start_address().as_u64();
+
+        for region in self.regions.iter().take(self.current_region) {
+            let region_start = region.start.start_address().as_u64();
+            let region_end = region.end_exclusive.start_address().as_u64();
+
+            if frame_addr >= region_start && frame_addr < region_end {
+                return true;
+            }
+        }
+
+        let current_region = self.regions[self.current_region];
+        let current_region_start = current_region.start.start_address().as_u64();
+        let next_frame_addr = self.next_frame.unwrap().start_address().as_u64();
+
+        return frame_addr >= current_region_start && frame_addr < next_frame_addr;
+    }
+
+    /// Returns whether `frame` is already present in the freed-frame reuse stack.
+    fn is_already_freed(&self, frame: PhysicalFrame) -> bool {
+        for freed_frame in self.freed_frames.iter().take(self.freed_count).flatten() {
+            if *freed_frame == frame {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /// Normalizes one remaining usable physical span and appends it if a full
     /// 4 KiB frame still fits after alignment.
-    fn push_allocatable_range(
-        &mut self,
-        range: PhysicalRange,
-    ) -> Result<(), AllocatorInitError> {
+    fn push_allocatable_range(&mut self, range: PhysicalRange) -> Result<(), AllocatorInitError> {
         let aligned_start = range
             .start
             .checked_align_up()
@@ -159,7 +248,7 @@ impl MonotonicFrameAllocator {
             .ok_or(AllocatorInitError::BadFrameRegion)?;
 
         if self.region_count >= MAX_ALLOCATABLE_FRAME_REGIONS {
-            return Err(AllocatorInitError::TooManyUsableRegions);
+            return Err(AllocatorInitError::TooManyAllocatableRegions);
         }
 
         self.regions[self.region_count] = UsableFrameRegion {
@@ -173,8 +262,9 @@ impl MonotonicFrameAllocator {
     /// Builds allocator-owned usable frame ranges from the parsed boot memory map.
     ///
     /// The constructor keeps only `Usable` regions, normalizes them to 4 KiB
-    /// frame boundaries, discards post-alignment empty ranges, and initializes
-    /// the allocator cursor to the first allocatable frame if one exists.
+    /// frame boundaries, discards post-alignment empty ranges, resets the
+    /// freed-frame reuse stack, and initializes the allocator cursor to the
+    /// first allocatable frame if one exists.
     pub fn initialize_from_boot_info(
         &mut self,
         boot_info: &BootInfo,
@@ -185,6 +275,8 @@ impl MonotonicFrameAllocator {
         self.region_count = 0;
         self.current_region = 0;
         self.next_frame = None;
+        self.freed_frames = [None; MAX_ALLOCATABLE_FRAME_REGIONS];
+        self.freed_count = 0;
 
         for region in boot_info
             .regions()
@@ -209,7 +301,7 @@ impl MonotonicFrameAllocator {
                 for fragment in fragments.iter().flatten() {
                     for piece in subtract_range(*fragment, reserved).iter().flatten() {
                         if next_count >= MAX_REGION_FRAGMENTS {
-                            return Err(AllocatorInitError::TooManyUsableRegions);
+                            return Err(AllocatorInitError::TooManyAllocatableRegions);
                         }
 
                         next_fragments[next_count] = Some(*piece);
@@ -239,8 +331,17 @@ impl MonotonicFrameAllocator {
         return Ok(allocator);
     }
 
-    /// Returns the next allocatable 4 KiB frame and advances the internal cursor.
+    /// Returns the next allocatable 4 KiB frame.
+    ///
+    /// Freed frames are reused first in LIFO order. If no freed frame is
+    /// available, allocation falls back to the monotonic usable-region cursor.
     pub fn allocate_frame(&mut self) -> Option<PhysicalFrame> {
+        if self.freed_count != 0 {
+            self.freed_count -= 1;
+            let freed_frame = self.freed_frames[self.freed_count].take();
+            return freed_frame;
+        }
+
         if self.next_frame.is_none() {
             return None;
         }
@@ -274,5 +375,31 @@ impl MonotonicFrameAllocator {
                 return Some(allocated);
             }
         }
+    }
+
+    /// Returns one runtime-owned frame to the allocator's LIFO reuse stack.
+    ///
+    /// This rejects permanently reserved frames, unmanaged frames, and frames
+    /// that are already waiting in the reuse stack.
+    pub fn free(&mut self, frame: PhysicalFrame) -> Result<(), FreeError> {
+        if Self::is_reserved_frame(frame) {
+            return Err(FreeError::ReservedFrame);
+        }
+
+        if !self.is_allocatable_frame(frame) || !self.was_monotonically_allocated(frame) {
+            return Err(FreeError::UnmanagedFrame);
+        }
+
+        if self.is_already_freed(frame) {
+            return Err(FreeError::FrameAlreadyFreed);
+        }
+
+        if self.freed_count >= MAX_ALLOCATABLE_FRAME_REGIONS {
+            return Err(FreeError::FreedFrameOverflow);
+        }
+
+        self.freed_frames[self.freed_count] = Some(frame);
+        self.freed_count += 1;
+        return Ok(());
     }
 }

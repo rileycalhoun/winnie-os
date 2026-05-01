@@ -12,6 +12,7 @@ pub mod boot_info;
 pub mod console;
 pub mod drivers;
 pub mod memory;
+pub mod sync;
 pub mod test_support;
 
 /// Wraps the single early-boot `BootInfo` instance in interior mutability.
@@ -88,6 +89,93 @@ fn log_allocator_sample(allocator: &mut MonotonicFrameAllocator) {
     }
 }
 
+/// Proves the runtime mapper can install and remove one higher-half 4 KiB page.
+fn log_runtime_mapping_sample(allocator: &mut MonotonicFrameAllocator) {
+    let frame = match allocator.allocate_frame() {
+        Some(frame) => frame,
+        None => {
+            println!("PAGING MAP FAILED: allocator exhausted");
+            hlt_loop()
+        }
+    };
+
+    match arch::x86_64::paging::map_kernel_page(
+        arch::x86_64::paging::RUNTIME_SCRATCH_PAGE_VIRT_ADDR,
+        frame,
+    ) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("PAGING MAP FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+
+    let scratch_page = arch::x86_64::paging::RUNTIME_SCRATCH_PAGE_VIRT_ADDR as *mut u64;
+
+    // Sound because the runtime mapper just installed a writable 4 KiB mapping
+    // at `RUNTIME_SCRATCH_PAGE_VIRT_ADDR`, so one volatile write/read through
+    // that address stays within the mapped page under test.
+    let mapped_value = unsafe {
+        core::ptr::write_volatile(scratch_page, 0x1122_3344_5566_7788);
+        core::ptr::read_volatile(scratch_page)
+    };
+
+    if mapped_value != 0x1122_3344_5566_7788 {
+        println!("PAGING MAP FAILED: verification mismatch");
+        hlt_loop()
+    }
+
+    match arch::x86_64::paging::unmap_kernel_page(
+        arch::x86_64::paging::RUNTIME_SCRATCH_PAGE_VIRT_ADDR,
+    ) {
+        Ok(()) => {}
+        Err(error) => {
+            println!("PAGING UNMAP FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+
+    println!("PAGING MAP OK");
+}
+
+/// Takes explicit ownership of the legacy PIC state for later APIC bring-up.
+fn initialize_legacy_pic() {
+    arch::x86_64::pic::mask_all();
+    println!("{}", arch::x86_64::pic::PIC_INIT_MARKER);
+}
+
+/// Maps and enables the LAPIC through the runtime MMIO slot.
+fn initialize_local_apic() {
+    match arch::x86_64::apic::initialize() {
+        Ok(()) => {
+            println!("{}", arch::x86_64::apic::LAPIC_INIT_MARKER);
+        }
+        Err(error) => {
+            println!("LAPIC INIT FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+}
+
+/// Programs the LAPIC timer for the first periodic interrupt proof.
+fn initialize_periodic_timer() {
+    match arch::x86_64::timer::initialize() {
+        Ok(()) => {
+            println!("{}", arch::x86_64::timer::TIMER_INIT_MARKER);
+        }
+        Err(error) => {
+            println!("TIMER INIT FAILED: {:?}", error);
+            hlt_loop()
+        }
+    }
+}
+
+fn enable_interrupts() {
+    // Sound because the IDT, PIC masking, LAPIC, and timer path are all
+    // initialized before this point on the normal boot path.
+    unsafe { core::arch::asm!("sti", options(nomem, nostack, preserves_flags)) }
+}
+
 /// Runs as the higher-half Rust entrypoint after the architecture bootstrap code
 /// has finished entering long mode and transferring control into the kernel.
 ///
@@ -104,6 +192,8 @@ fn log_allocator_sample(allocator: &mut MonotonicFrameAllocator) {
 /// never returns because there is no scheduler, idle task, or later boot stage
 /// to return to in the current system.
 pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
+    arch::x86_64::timer::reset_timer_state();
+
     // Sound because early kernel bring-up is single-threaded and this storage
     // is initialized exactly once before any later shared access exists.
     let boot_info = unsafe { &mut *BOOT_INFO.0.get() };
@@ -127,9 +217,17 @@ pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
         }
     }
 
+    initialize_legacy_pic();
+    initialize_local_apic();
     log_boot_info(boot_info);
+    println!();
     log_allocator_sample(allocator);
+    println!();
+    log_runtime_mapping_sample(allocator);
+    println!();
+    initialize_periodic_timer();
     println!("Hello from WinnieOS!");
+    enable_interrupts();
     hlt_loop()
 }
 

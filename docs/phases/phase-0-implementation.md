@@ -90,7 +90,7 @@
 - Modify: `src/drivers/vga.rs`
 - Modify: `src/main.rs`
 
-- [ ] **Step 1: Define the minimal console boundary**
+- [x] **Step 1: Define the minimal console boundary**
 
 Document the intended responsibilities before changing code:
 
@@ -102,7 +102,7 @@ Expected outcome:
 
 - no backend owns the user-facing `print!`/`println!` contract by itself
 
-- [ ] **Step 2: Add the COM1 serial backend**
+- [x] **Step 2: Add the COM1 serial backend**
 
 Implement:
 
@@ -117,7 +117,7 @@ Constraints:
 - no interrupt-driven behavior
 - no locking beyond current single-core assumptions
 
-- [ ] **Step 3: Convert `console` into a mirrored frontend**
+- [x] **Step 3: Convert `console` into a mirrored frontend**
 
 Update `print!` and `println!` so normal kernel output mirrors to:
 
@@ -129,7 +129,7 @@ Expected behavior:
 - the existing boot banner still appears on VGA
 - the same output appears over serial in headless QEMU
 
-- [ ] **Step 4: Initialize serial before other boot-stage logging**
+- [x] **Step 4: Initialize serial before other boot-stage logging**
 
 Update `kernel_main_high` startup ordering so:
 
@@ -137,7 +137,7 @@ Update `kernel_main_high` startup ordering so:
 2. mirrored console is usable immediately after
 3. later boot stages can safely log
 
-- [ ] **Step 5: Build and smoke-run the normal kernel**
+- [x] **Step 5: Build and smoke-run the normal kernel**
 
 Run the narrowest relevant verification command once the new scripts exist. Before scripts exist, use the current local build path as a temporary check.
 
@@ -146,7 +146,7 @@ Expected result:
 - boot succeeds
 - identical startup output is visible on VGA and serial
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Suggested commit:
 
@@ -165,7 +165,7 @@ git commit -m "feat(console): mirror kernel output to serial and vga"
 - Modify: `src/arch/x86_64/mod.rs`
 - Modify: `src/arch/x86_64/boot.rs`
 
-- [ ] **Step 1: Define the stable post-parse representation**
+- [x] **Step 1: Define the stable post-parse representation**
 
 Add a small owned `BootInfo` model with:
 
@@ -174,7 +174,7 @@ Add a small owned `BootInfo` model with:
 - explicit region-kind enum
 - helper iteration APIs that do not expose raw Multiboot2 internals
 
-- [ ] **Step 2: Preserve the Multiboot2 information pointer in bootstrap**
+- [x] **Step 2: Preserve the Multiboot2 information pointer in bootstrap**
 
 Make the smallest possible change in `boot.rs` to capture the raw pointer and pass it into Rust.
 
@@ -184,7 +184,7 @@ Rules:
 - do not restructure stack or TSS setup
 - keep new assembly comments focused on the handoff invariant only
 
-- [ ] **Step 3: Parse the memory-map tag in Rust**
+- [x] **Step 3: Parse the memory-map tag in Rust**
 
 Implement a small Multiboot2 parser module that:
 
@@ -193,7 +193,7 @@ Implement a small Multiboot2 parser module that:
 - copies regions into `BootInfo`
 - ignores unsupported tags unless they affect safety
 
-- [ ] **Step 4: Log the parsed boot memory map over serial**
+- [x] **Step 4: Log the parsed boot memory map over serial**
 
 Emit deterministic stage markers plus structured memory-region lines.
 
@@ -203,14 +203,14 @@ Expected output shape:
 - one line per parsed region
 - one summary marker indicating success or a fixed parse failure message
 
-- [ ] **Step 5: Verify with a headless QEMU boot**
+- [x] **Step 5: Verify with a headless QEMU boot**
 
 Expected result:
 
 - normal boot still reaches the terminal `hlt` path
 - serial output includes parsed memory-region lines
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Suggested commit:
 
@@ -227,7 +227,7 @@ git commit -m "feat(boot): parse multiboot memory map into boot info"
 - Modify: `src/arch/x86_64/idt.rs`
 - Create: `src/test_support/mod.rs`
 
-- [ ] **Step 1: Define fixed serial-visible fatal markers**
+- [x] **Step 1: Define fixed serial-visible fatal markers**
 
 Choose exact output markers for:
 
@@ -242,7 +242,7 @@ Requirement:
 
 - markers stay stable once introduced because scripts will depend on them
 
-- [ ] **Step 2: Ensure panic uses the same minimal reporting contract**
+- [x] **Step 2: Ensure panic uses the same minimal reporting contract**
 
 Keep the panic path simple:
 
@@ -250,7 +250,7 @@ Keep the panic path simple:
 - optionally print minimal safe metadata only if it does not complicate the path
 - enter terminal halt or test-specific exit behavior
 
-- [ ] **Step 3: Ensure IDT handlers remain minimal and deterministic**
+- [x] **Step 3: Ensure IDT handlers remain minimal and deterministic**
 
 Verify:
 
@@ -258,14 +258,14 @@ Verify:
 - `#DF` still uses IST1
 - handlers still terminate immediately after fixed reporting
 
-- [ ] **Step 4: Build and verify all non-test boot paths**
+- [x] **Step 4: Build and verify all non-test boot paths**
 
 Expected result:
 
 - normal boot unchanged except for stronger serial visibility
 - deliberate manual fault triggers, if temporarily added during development, produce the expected marker
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Suggested commit:
 
@@ -283,7 +283,7 @@ git commit -m "refactor(traps): standardize fatal serial reporting"
 - Modify: `src/test_support/mod.rs`
 - Modify: `src/main.rs`
 
-- [ ] **Step 1: Add explicit QEMU success and failure exit codes**
+- [x] **Step 1: Add explicit QEMU success and failure exit codes**
 
 Implement a tiny helper around `isa-debug-exit` with:
 
@@ -291,7 +291,7 @@ Implement a tiny helper around `isa-debug-exit` with:
 - one failure code
 - one helper for unrecoverable harness misuse if needed
 
-- [ ] **Step 2: Add shared serial test-reporting helpers**
+- [x] **Step 2: Add shared serial test-reporting helpers**
 
 Create helpers for:
 
@@ -300,7 +300,7 @@ Create helpers for:
 - per-test failure marker
 - suite summary marker
 
-- [ ] **Step 3: Isolate test-only behavior from the normal kernel path**
+- [x] **Step 3: Isolate test-only behavior from the normal kernel path**
 
 Structure the code so the normal runtime path does not depend on:
 
@@ -308,13 +308,13 @@ Structure the code so the normal runtime path does not depend on:
 - QEMU exit side effects
 - test-only panic handling
 
-- [ ] **Step 4: Verify helper behavior with one temporary smoke case**
+- [x] **Step 4: Verify helper behavior with one temporary smoke case**
 
 Expected result:
 
 - a test-configured kernel can emit serial markers and terminate QEMU predictably
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Suggested commit:
 
@@ -332,7 +332,7 @@ git commit -m "feat(test): add qemu exit and shared test utilities"
 - Modify: `Cargo.toml`
 - Modify: `.cargo/config.toml`
 
-- [ ] **Step 1: Enable the Phil Opp-style custom test framework flow**
+- [x] **Step 1: Enable the Phil Opp-style custom test framework flow**
 
 Add the required crate attributes and harness entrypoint pattern for:
 
@@ -344,7 +344,7 @@ Requirement:
 
 - keep the normal non-test kernel entrypoint easy to audit
 
-- [ ] **Step 2: Implement the integration test runner**
+- [x] **Step 2: Implement the integration test runner**
 
 The runner should:
 
@@ -354,7 +354,7 @@ The runner should:
 - print structured pass/fail lines
 - exit QEMU successfully on completion
 
-- [ ] **Step 3: Add the first bootable integration smoke test**
+- [x] **Step 3: Add the first bootable integration smoke test**
 
 Keep the test in the bootable main binary:
 
@@ -363,7 +363,7 @@ Keep the test in the bootable main binary:
 - report success over serial
 - exit QEMU with the success code
 
-- [ ] **Step 4: Run the integration harness**
+- [x] **Step 4: Run the integration harness**
 
 Run the dedicated harness command.
 
@@ -372,7 +372,7 @@ Expected result:
 - serial output clearly shows suite start and pass
 - QEMU exits with the success code
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Suggested commit:
 
@@ -391,7 +391,7 @@ git commit -m "feat(test): add no-std kernel integration harness"
 - Modify: `src/test_support/mod.rs`
 - Modify: `Cargo.toml`
 
-- [ ] **Step 1: Define one expected outcome contract per destructive test**
+- [x] **Step 1: Define one expected outcome contract per destructive test**
 
 Each destructive test must declare:
 
@@ -399,7 +399,7 @@ Each destructive test must declare:
 - the exact expected serial marker
 - whether success is detected by QEMU exit code, terminal halt plus log match, or both
 
-- [ ] **Step 2: Add the panic-path test scenario**
+- [x] **Step 2: Add the panic-path test scenario**
 
 Implement a compile-time-selected panic scenario that:
 
@@ -408,7 +408,7 @@ Implement a compile-time-selected panic scenario that:
 - emits the expected marker
 - exits or halts in the expected way for the wrapper script
 
-- [ ] **Step 3: Add invalid-opcode and general-protection tests**
+- [x] **Step 3: Add invalid-opcode and general-protection tests**
 
 Implement one compile-time-selected scenario each.
 
@@ -417,7 +417,7 @@ Rules:
 - keep the trigger local and obvious
 - do not reuse a generalized “fault injector”
 
-- [ ] **Step 4: Add page-fault and double-fault scenarios**
+- [x] **Step 4: Add page-fault and double-fault scenarios**
 
 Implement one compile-time-selected scenario each.
 
@@ -426,14 +426,14 @@ Critical verification points:
 - page-fault test still reaches the IST2-backed handler
 - double-fault test still reaches the IST1-backed handler
 
-- [ ] **Step 5: Run the destructive suite**
+- [x] **Step 5: Run the destructive suite**
 
 Expected result:
 
 - every scenario emits the correct fixed marker
 - scripts classify expected failure as pass and unexpected behavior as fail
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Suggested commit:
 
@@ -454,7 +454,7 @@ git commit -m "feat(test): add destructive fault kernel tests"
 - Modify: `.cargo/config.toml`
 - Modify: `Cargo.toml`
 
-- [ ] **Step 1: Split image construction from execution**
+- [x] **Step 1: Split image construction from execution**
 
 Create a reusable image-build script that:
 
@@ -462,7 +462,7 @@ Create a reusable image-build script that:
 - copies it into the ISO tree
 - builds the ISO
 
-- [ ] **Step 2: Add a normal smoke runner**
+- [x] **Step 2: Add a normal smoke runner**
 
 The smoke runner should:
 
@@ -470,14 +470,14 @@ The smoke runner should:
 - capture serial output
 - fail if the expected boot marker is missing
 
-- [ ] **Step 3: Add separate integration and destructive test runners**
+- [x] **Step 3: Add separate integration and destructive test runners**
 
 Requirements:
 
 - integration harness runner expects QEMU success exit
 - destructive runner iterates scenarios and checks each scenario-specific marker
 
-- [ ] **Step 4: Add cargo aliases or documented command shims**
+- [x] **Step 4: Add cargo aliases or documented command shims**
 
 Expose stable commands such as:
 
@@ -487,7 +487,7 @@ Expose stable commands such as:
 
 Pick one documented primary interface and keep the others thin wrappers.
 
-- [ ] **Step 5: Verify all three command paths**
+- [x] **Step 5: Verify all three command paths**
 
 Required checks:
 
@@ -495,7 +495,7 @@ Required checks:
 - integration harness command passes
 - destructive suite command passes
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Suggested commit:
 
@@ -517,7 +517,7 @@ git commit -m "build: add scripted qemu smoke and test runners"
   - `~/Documents/winnie-os/architecture/Current Memory Layout.md`
   - `~/Documents/winnie-os/architecture/Current Trap And Fault Handling.md`
 
-- [ ] **Step 1: Document the serial-first verification path**
+- [x] **Step 1: Document the serial-first verification path**
 
 Explain:
 
@@ -525,7 +525,7 @@ Explain:
 - how VGA mirroring fits in
 - what the stable commands are
 
-- [ ] **Step 2: Document the boot-info handoff**
+- [x] **Step 2: Document the boot-info handoff**
 
 Cover:
 
@@ -533,7 +533,7 @@ Cover:
 - Rust-side parsing boundary
 - the owned memory-map representation
 
-- [ ] **Step 3: Document the harness lanes**
+- [x] **Step 3: Document the harness lanes**
 
 Cover:
 
@@ -541,11 +541,11 @@ Cover:
 - destructive suite expectations
 - stable markers and success conditions
 
-- [ ] **Step 4: Update the Obsidian vault**
+- [x] **Step 4: Update the Obsidian vault**
 
 Keep the paired architecture notes aligned with the implemented code and verification workflow.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 Suggested commit:
 
@@ -560,7 +560,7 @@ git commit -m "docs: record phase 0 verification and boot design"
 
 - No new product files required
 
-- [ ] **Step 1: Run the full Phase 0 verification set**
+- [x] **Step 1: Run the full Phase 0 verification set**
 
 Required command categories:
 
@@ -573,7 +573,7 @@ Expected result:
 - all commands pass
 - serial logs show the expected stage and result markers
 
-- [ ] **Step 2: Inspect for regressions in architecture-critical paths**
+- [x] **Step 2: Inspect for regressions in architecture-critical paths**
 
 Review these files carefully before signoff:
 
@@ -587,7 +587,7 @@ Confirm:
 - IST slot assignments remain intact
 - new logic did not broaden the destructive fault paths
 
-- [ ] **Step 3: Record any residual gaps explicitly**
+- [x] **Step 3: Record any residual gaps explicitly**
 
 If any scenario remains partially verified, capture:
 
@@ -595,7 +595,7 @@ If any scenario remains partially verified, capture:
 - what was verified
 - what is still missing
 
-- [ ] **Step 4: Final commit or merge-ready handoff**
+- [x] **Step 4: Final commit or merge-ready handoff**
 
 Suggested final commit if a separate integration commit is desired:
 

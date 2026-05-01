@@ -274,6 +274,13 @@ pub fn init() {
     unsafe { (*idt).set(13, general_protection_handler as *const () as u64) };
     // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
     unsafe { (*idt).set_with_ist(14, page_fault_handler as *const () as u64, 2) };
+    // Sound because `idt` is the only mutable reference to the global IDT for this initialization sequence.
+    unsafe {
+        (*idt).set(
+            crate::arch::x86_64::timer::TIMER_IRQ_VECTOR as usize,
+            crate::arch::x86_64::timer::timer_interrupt_handler as *const () as u64,
+        )
+    };
     // Sound because `idt` still points to the initialized static IDT for the duration of this call.
     unsafe { (*idt).load() };
 }

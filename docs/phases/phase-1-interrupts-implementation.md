@@ -69,7 +69,7 @@
 - Modify: `src/arch/x86_64/mod.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Pick the first timer IRQ vector**
+- [x] **Step 1: Pick the first timer IRQ vector**
 
 Define one vector constant above the CPU exception range, for example in the
 usual IRQ remap range.
@@ -79,7 +79,7 @@ Requirements:
 - clearly separate exceptions from IRQ vectors
 - document the intended purpose of the timer vector
 
-- [ ] **Step 2: Define the minimal shared timer state**
+- [x] **Step 2: Define the minimal shared timer state**
 
 Add the smallest state needed to prove timer delivery, such as:
 
@@ -88,7 +88,7 @@ Add the smallest state needed to prove timer delivery, such as:
 
 Do not add scheduler-facing semantics yet.
 
-- [ ] **Step 3: Add the failing timer-proof command or smoke extension**
+- [x] **Step 3: Add the failing timer-proof command or smoke extension**
 
 Write the narrowest proof that currently fails because no timer interrupt path
 exists yet and because the current smoke path exits too early to observe one.
@@ -98,12 +98,12 @@ Examples:
 - expected timer tick count stays zero
 - expected serial marker never appears
 
-- [ ] **Step 4: Verify the proof fails**
+- [x] **Step 4: Verify the proof fails**
 
 Run the smallest relevant command and confirm the failure is due to the missing
 timer path rather than unrelated boot issues.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib.rs src/arch/x86_64/mod.rs src/arch/x86_64/timer.rs
@@ -117,13 +117,13 @@ git commit -m "feat(timer): define first timer vector and state"
 - Create: `src/arch/x86_64/pic.rs`
 - Modify: `src/lib.rs` or `src/main.rs` for init ordering if needed
 
-- [ ] **Step 1: Write the failing initialization proof**
+- [x] **Step 1: Write the failing initialization proof**
 
 Add the narrowest proof that explicit PIC ownership is missing, likely a serial
 stage marker expectation around interrupt-controller init on the normal boot
 path in `lib.rs`.
 
-- [ ] **Step 2: Verify the proof fails**
+- [x] **Step 2: Verify the proof fails**
 
 Run:
 
@@ -135,7 +135,7 @@ Expected:
 
 - the new controller stage marker is absent because the path is not implemented
 
-- [ ] **Step 3: Implement conservative PIC masking or disable**
+- [x] **Step 3: Implement conservative PIC masking or disable**
 
 Add one explicit helper that:
 
@@ -144,7 +144,7 @@ Add one explicit helper that:
 
 Do not add APIC logic here.
 
-- [ ] **Step 4: Verify normal boot still succeeds**
+- [x] **Step 4: Verify normal boot still succeeds**
 
 Run:
 
@@ -158,7 +158,7 @@ Expected:
 - normal boot still succeeds
 - destructive fault paths still behave identically
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib.rs src/main.rs src/arch/x86_64/pic.rs
@@ -174,24 +174,24 @@ git commit -m "feat(irq): add explicit PIC handling"
 - Modify: `src/lib.rs`
 - Modify: memory-track mapping files only as needed for MMIO support
 
-- [ ] **Step 1: Write the failing LAPIC-init proof**
+- [x] **Step 1: Write the failing LAPIC-init proof**
 
 Add the narrowest proof that LAPIC init is missing, such as an expected serial
 marker after the MMIO mapping and controller setup stage.
 
-- [ ] **Step 2: Verify the proof fails**
+- [x] **Step 2: Verify the proof fails**
 
 Run the timer-proof command or extended smoke path and confirm the new marker is
 absent for the expected reason.
 
-- [ ] **Step 3: Implement LAPIC MMIO access**
+- [x] **Step 3: Implement LAPIC MMIO access**
 
 Use the memory track’s runtime mapping helper to map the LAPIC page, then add
 register access helpers for only the registers currently needed.
 
 Prefer xAPIC MMIO first unless a clear x2APIC simplification is established.
 
-- [ ] **Step 4: Implement minimal LAPIC initialization**
+- [x] **Step 4: Implement minimal LAPIC initialization**
 
 Bring up only what the timer path needs:
 
@@ -199,7 +199,7 @@ Bring up only what the timer path needs:
 - spurious-interrupt vector setup if required
 - EOI support
 
-- [ ] **Step 5: Verify controller init and destructive-fault stability**
+- [x] **Step 5: Verify controller init and destructive-fault stability**
 
 Run:
 
@@ -214,7 +214,7 @@ Expected:
 - LAPIC init markers appear
 - destructive fault scenarios remain intact
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/arch/x86_64/mod.rs src/arch/x86_64/apic.rs src/arch/x86_64/paging.rs src/memory/mod.rs
@@ -229,14 +229,14 @@ git commit -m "feat(apic): initialize LAPIC through runtime MMIO mapping"
 - Modify: `src/arch/x86_64/timer.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write the failing timer-interrupt proof**
+- [x] **Step 1: Write the failing timer-interrupt proof**
 
 Add the narrowest proof that the timer vector still does not fire:
 
 - a tick counter remains zero, or
 - an expected “first timer tick” marker never appears
 
-- [ ] **Step 2: Verify the proof fails**
+- [x] **Step 2: Verify the proof fails**
 
 Run:
 
@@ -248,12 +248,12 @@ Expected:
 
 - no timer proof appears because the handler is not installed yet
 
-- [ ] **Step 3: Add the timer vector to the IDT**
+- [x] **Step 3: Add the timer vector to the IDT**
 
 Install the timer handler on the chosen IRQ vector without changing the current
 fatal exception vectors or IST assignments.
 
-- [ ] **Step 4: Implement the minimal handler**
+- [x] **Step 4: Implement the minimal handler**
 
 The handler should:
 
@@ -262,7 +262,7 @@ The handler should:
 - send EOI through the LAPIC path
 - return normally
 
-- [ ] **Step 5: Verify periodic interrupts are firing**
+- [x] **Step 5: Verify periodic interrupts are firing**
 
 Run:
 
@@ -278,7 +278,7 @@ Expected:
 - timer proof marker appears
 - the normal boot path remains otherwise stable
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/arch/x86_64/idt.rs src/arch/x86_64/timer.rs
@@ -294,19 +294,19 @@ git commit -m "feat(timer): add periodic timer interrupt handler"
 - Modify: `src/lib.rs`
 - Modify: `src/arch/x86_64/timer.rs` if shared timer state needs protection
 
-- [ ] **Step 1: Write the failing synchronization proof**
+- [x] **Step 1: Write the failing synchronization proof**
 
 Choose the narrowest proof that shared timer state needs controlled access.
 
 This can be a design-level failing check in the harness or a minimal API test
 that demonstrates the need for explicit lock discipline.
 
-- [ ] **Step 2: Verify the proof fails**
+- [x] **Step 2: Verify the proof fails**
 
 Confirm the failure corresponds to the missing synchronization primitive or API
 boundary.
 
-- [ ] **Step 3: Implement the smallest interrupt-safe spinlock**
+- [x] **Step 3: Implement the smallest interrupt-safe spinlock**
 
 The primitive should:
 
@@ -315,11 +315,11 @@ The primitive should:
   chosen API
 - avoid growing into a general synchronization subsystem
 
-- [ ] **Step 4: Protect the shared timer state if needed**
+- [x] **Step 4: Protect the shared timer state if needed**
 
 Use the spinlock only where the timer/IRQ path requires it.
 
-- [ ] **Step 5: Verify boot, timer, and fault paths**
+- [x] **Step 5: Verify boot, timer, and fault paths**
 
 Run:
 
@@ -337,7 +337,7 @@ Expected:
 - harness still passes
 - destructive fault scenarios still behave as designed
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/sync/mod.rs src/sync/spinlock.rs src/arch/x86_64/timer.rs

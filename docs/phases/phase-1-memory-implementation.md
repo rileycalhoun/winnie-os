@@ -51,7 +51,7 @@
 - Create: `src/memory/frame.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Add the memory module root**
+- [x] **Step 1: Add the memory module root**
 
 Expose a narrow public surface for:
 
@@ -63,7 +63,7 @@ Expected outcome:
 
 - no paging or allocation logic leaks directly through `lib.rs`
 
-- [ ] **Step 2: Add the physical address and frame types**
+- [x] **Step 2: Add the physical address and frame types**
 
 Implement small owned types for:
 
@@ -77,14 +77,14 @@ Requirements:
 - explicit conversion boundaries between addresses and frames
 - no premature huge-page support
 
-- [ ] **Step 3: Add one minimal compile-time or harness-visible smoke check**
+- [x] **Step 3: Add one minimal compile-time or harness-visible smoke check**
 
 Write the narrowest test or boot-time assertion that proves:
 
 - frame alignment helpers behave as expected
 - usable-region iteration can be expressed in frame terms
 
-- [ ] **Step 4: Verify the new types compile without changing boot behavior**
+- [x] **Step 4: Verify the new types compile without changing boot behavior**
 
 Run:
 
@@ -98,7 +98,7 @@ Expected:
 - normal boot still succeeds
 - no new boot-path regressions
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib.rs src/memory/mod.rs src/memory/frame.rs
@@ -114,7 +114,7 @@ git commit -m "feat(memory): add physical frame model"
 - Modify: `src/boot_info.rs` only if a helper is truly needed
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write the failing allocator-behavior test**
+- [x] **Step 1: Write the failing allocator-behavior test**
 
 Add the narrowest check for:
 
@@ -125,7 +125,7 @@ Add the narrowest check for:
 The first test can be a small in-kernel harness/unit-style test over synthetic
 region input if that is simpler than boot-path observation.
 
-- [ ] **Step 2: Verify the test fails for the intended reason**
+- [x] **Step 2: Verify the test fails for the intended reason**
 
 Run the narrowest relevant command:
 
@@ -137,7 +137,7 @@ Expected:
 
 - failure because allocator behavior is not implemented yet
 
-- [ ] **Step 3: Implement reservation-free monotonic allocation**
+- [x] **Step 3: Implement reservation-free monotonic allocation**
 
 Add allocator state that:
 
@@ -148,7 +148,7 @@ Add allocator state that:
 
 Do not implement `free()` yet.
 
-- [ ] **Step 4: Add serial-visible boot logging for a tiny allocation sample**
+- [x] **Step 4: Add serial-visible boot logging for a tiny allocation sample**
 
 During normal boot, log:
 
@@ -157,7 +157,7 @@ During normal boot, log:
 
 Keep it deterministic and small.
 
-- [ ] **Step 5: Verify the allocator works in both harness and boot paths**
+- [x] **Step 5: Verify the allocator works in both harness and boot paths**
 
 Run:
 
@@ -172,7 +172,7 @@ Expected:
 - the test harness still passes
 - allocation markers appear over serial in smoke output
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/boot_info.rs src/lib.rs src/memory/mod.rs src/memory/allocator.rs
@@ -187,7 +187,7 @@ git commit -m "feat(memory): add monotonic physical frame allocator"
 - Modify: `src/lib.rs`
 - Modify: `src/arch/x86_64/boot.rs` only if a symbol export is strictly required
 
-- [ ] **Step 1: Define the required reservation inputs**
+- [x] **Step 1: Define the required reservation inputs**
 
 Collect the ranges that must never be allocated:
 
@@ -200,22 +200,22 @@ Collect the ranges that must never be allocated:
 
 Prefer existing linker/bootstrap symbols over inferred layout.
 
-- [ ] **Step 2: Add the failing reservation test**
+- [x] **Step 2: Add the failing reservation test**
 
 Write the narrowest test or assertion showing that one known reserved frame is
 still incorrectly returned by the current allocator.
 
-- [ ] **Step 3: Verify the reservation test fails**
+- [x] **Step 3: Verify the reservation test fails**
 
 Run the smallest relevant verification path and confirm failure is due to the
 missing reservation overlay rather than unrelated compile issues.
 
-- [ ] **Step 4: Implement explicit reserved-range filtering**
+- [x] **Step 4: Implement explicit reserved-range filtering**
 
 Overlay the reserved ranges on top of usable boot regions so allocation skips
 kernel-owned frames deterministically.
 
-- [ ] **Step 5: Verify with serial-visible allocation sampling**
+- [x] **Step 5: Verify with serial-visible allocation sampling**
 
 Run:
 
@@ -228,7 +228,7 @@ Expected:
 - allocation markers still appear
 - sampled frames no longer overlap known reserved ranges
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/memory/allocator.rs
@@ -244,7 +244,7 @@ git commit -m "fix(memory): reserve kernel-owned physical frames"
 - Modify: `src/memory/mod.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write the failing mapping test or boot-time proof**
+- [x] **Step 1: Write the failing mapping test or boot-time proof**
 
 Choose the narrowest proof that the runtime mapper must satisfy, for example:
 
@@ -252,12 +252,12 @@ Choose the narrowest proof that the runtime mapper must satisfy, for example:
 - write through the mapped address
 - unmap it cleanly
 
-- [ ] **Step 2: Verify the proof fails before implementation**
+- [x] **Step 2: Verify the proof fails before implementation**
 
 Run the smallest relevant path and confirm failure is due to absent runtime
 mapping support.
 
-- [ ] **Step 3: Implement x86_64 page-table walking**
+- [x] **Step 3: Implement x86_64 page-table walking**
 
 Add helpers that can:
 
@@ -267,7 +267,7 @@ Add helpers that can:
 
 Keep the implementation x86_64-specific and auditable.
 
-- [ ] **Step 4: Add explicit kernel mapping helpers**
+- [x] **Step 4: Add explicit kernel mapping helpers**
 
 Support at minimum:
 
@@ -276,7 +276,7 @@ Support at minimum:
 - preserving intentional guard-page holes
 - mapping one MMIO page for later interrupt work
 
-- [ ] **Step 5: Verify smoke and destructive fault invariants still hold**
+- [x] **Step 5: Verify smoke and destructive fault invariants still hold**
 
 Run:
 
@@ -290,7 +290,7 @@ Expected:
 - normal boot still succeeds
 - page-fault and double-fault scenarios still behave as designed
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/memory/mod.rs src/arch/x86_64/mod.rs src/arch/x86_64/paging.rs
@@ -304,7 +304,7 @@ git commit -m "feat(memory): add runtime x86_64 paging helpers"
 - Modify: `src/memory/allocator.rs`
 - Modify: `src/lib.rs`
 
-- [ ] **Step 1: Write the failing reuse test**
+- [x] **Step 1: Write the failing reuse test**
 
 Add the narrowest test showing:
 
@@ -312,7 +312,7 @@ Add the narrowest test showing:
 - next allocation can reuse a freed frame
 - permanently reserved frames cannot be freed successfully
 
-- [ ] **Step 2: Verify the test fails for the expected reason**
+- [x] **Step 2: Verify the test fails for the expected reason**
 
 Run:
 
@@ -324,14 +324,14 @@ Expected:
 
 - failure because `free()` / reuse is not yet implemented
 
-- [ ] **Step 3: Implement a minimal freed-frame structure**
+- [x] **Step 3: Implement a minimal freed-frame structure**
 
 Choose the smallest viable structure that does not require a heap:
 
 - fixed-capacity stack/queue of freed frames, or
 - compact bitmap/range structure only if clearly warranted
 
-- [ ] **Step 4: Implement `free()` with explicit ownership checks**
+- [x] **Step 4: Implement `free()` with explicit ownership checks**
 
 `free()` must:
 
@@ -340,7 +340,7 @@ Choose the smallest viable structure that does not require a heap:
 - accept runtime-owned allocated frames
 - make them available for later reuse
 
-- [ ] **Step 5: Verify reuse and boot stability**
+- [x] **Step 5: Verify reuse and boot stability**
 
 Run:
 
@@ -354,7 +354,7 @@ Expected:
 - reuse test passes
 - normal boot remains stable
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib.rs src/memory/allocator.rs
