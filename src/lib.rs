@@ -153,6 +153,8 @@ fn log_runtime_mapping_sample(allocator: &mut MonotonicFrameAllocator) {
 /// never returns because there is no scheduler, idle task, or later boot stage
 /// to return to in the current system.
 pub fn kernel_main(multiboot_magic: u32, multiboot_info_addr: usize) -> ! {
+    arch::x86_64::timer::reset_timer_state();
+
     // Sound because early kernel bring-up is single-threaded and this storage
     // is initialized exactly once before any later shared access exists.
     let boot_info = unsafe { &mut *BOOT_INFO.0.get() };

@@ -3,10 +3,11 @@
 BUILD_SCRIPT := ./scripts/build-image.sh
 RUN_SCRIPT := ./scripts/run-qemu.sh
 SMOKE_SCRIPT := ./scripts/run-qemu-smoke.sh
+TIMER_PROOF_SCRIPT := ./scripts/run-qemu-timer-proof.sh
 TEST_SCRIPT := ./scripts/run-qemu-tests.sh
 FAULTS_SCRIPT := ./scripts/run-qemu-fault-tests.sh
 
-.PHONY: help build run smoke test faults
+.PHONY: help build run smoke timer test faults
 
 help:
 	@printf '%s\n' \
@@ -14,6 +15,7 @@ help:
 		'  make build   - build the kernel image and bootable ISO' \
 		'  make run     - run the kernel in an interactive QEMU window' \
 		'  make smoke   - run the headless smoke boot check' \
+		'  make timer   - run the headless timer proof boot check' \
 		'  make test    - run the bootable kernel test harness' \
 		'  make faults  - run all dedicated fault-test scenarios'
 
@@ -28,6 +30,14 @@ smoke:
 		bash $(SMOKE_SCRIPT); \
 	else \
 		printf '%s\n' 'Missing ./scripts/run-qemu-smoke.sh; use `make run` for the current build path.'; \
+		exit 1; \
+	fi
+
+timer:
+	@if [ -f "$(TIMER_PROOF_SCRIPT)" ]; then \
+		bash $(TIMER_PROOF_SCRIPT); \
+	else \
+		printf '%s\n' 'Missing ./scripts/run-qemu-timer-proof.sh; no timer proof path exists yet.'; \
 		exit 1; \
 	fi
 
