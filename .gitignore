@@ -1,6 +1,10 @@
+# Build objects
 /target
 *.iso
 iso/boot/*.elf
+
+# QEMU Logs
 qemu.log
 qemu-test.log
 qemu-serial.log
+qemu-timer.log
